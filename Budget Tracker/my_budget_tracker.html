@@ -1,0 +1,537 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>My Budget Tracker</title>
+<style>
+  :root {
+    --bg: #f4f7fb;
+    --card: #ffffff;
+    --text: #172033;
+    --muted: #697386;
+    --line: #e4e8ef;
+    --primary: #2563eb;
+    --primary-dark: #1d4ed8;
+    --danger: #dc2626;
+    --success: #16803c;
+    --shadow: 0 8px 25px rgba(23,32,51,.08);
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    background: var(--bg);
+    color: var(--text);
+  }
+  .app {
+    width: min(760px, 100%);
+    margin: 0 auto;
+    padding: 20px 14px 40px;
+  }
+  header { margin-bottom: 18px; }
+  h1 { margin: 0 0 5px; font-size: 28px; }
+  .subtitle { margin: 0; color: var(--muted); }
+  .card {
+    background: var(--card);
+    border-radius: 18px;
+    padding: 18px;
+    margin-bottom: 14px;
+    box-shadow: var(--shadow);
+  }
+  .card h2 { margin: 0 0 14px; font-size: 18px; }
+  label { display: block; font-weight: 650; margin-bottom: 7px; }
+  input {
+    width: 100%;
+    border: 1px solid var(--line);
+    border-radius: 11px;
+    padding: 12px 13px;
+    font-size: 16px;
+    outline: none;
+    background: #fff;
+  }
+  input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(37,99,235,.1); }
+  .money-input { text-align: right; }
+  .summary {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+  }
+  .summary-box {
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 13px;
+    min-width: 0;
+  }
+  .summary-box .label { color: var(--muted); font-size: 13px; margin-bottom: 5px; }
+  .summary-box .value { font-weight: 800; font-size: 19px; overflow-wrap: anywhere; }
+  .balance .value { color: var(--success); }
+  .balance.negative .value { color: var(--danger); }
+  .toolbar {
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+    align-items: center;
+    margin-bottom: 10px;
+    flex-wrap: wrap;
+  }
+  .select-all { display: flex; align-items: center; gap: 8px; font-weight: 650; }
+  .select-all input, .expense-check { width: 20px; height: 20px; accent-color: var(--primary); }
+  button {
+    border: 0;
+    border-radius: 10px;
+    padding: 10px 13px;
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+  }
+  .primary { background: var(--primary); color: white; }
+  .primary:hover { background: var(--primary-dark); }
+  .secondary { background: #eef2f7; color: var(--text); }
+  .danger { background: #fee2e2; color: #991b1b; }
+  .expense-list { display: grid; gap: 9px; }
+  .expense-row {
+    display: grid;
+    grid-template-columns: 28px minmax(0, 1fr) 130px auto;
+    gap: 9px;
+    align-items: center;
+    border: 1px solid var(--line);
+    border-radius: 13px;
+    padding: 10px;
+  }
+  .expense-row.checked { background: #f8fbff; }
+  .expense-row { cursor: grab; }
+  .expense-row.dragging { opacity: .5; }
+  .expense-row.drag-over { border-color: var(--primary); background: #f8fbff; }
+  .expense-name { font-weight: 700; }
+  .amount-cell { display: flex; align-items: center; gap: 5px; }
+  .amount-cell input { padding: 9px 8px; text-align: right; }
+  .currency { color: var(--muted); font-weight: 700; }
+  .row-actions { display: flex; gap: 5px; }
+  .row-actions button { padding: 8px 9px; }
+  .hidden-amount { color: var(--muted); font-size: 14px; }
+  .add-form {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 150px auto;
+    gap: 8px;
+  }
+  .empty { color: var(--muted); padding: 12px 0; text-align: center; }
+  .note { color: var(--muted); font-size: 13px; margin: 10px 0 0; }
+  .actions { display: flex; gap: 8px; flex-wrap: wrap; }
+  .modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(23,32,51,.5);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    z-index: 100;
+  }
+  .modal-overlay.open { display: flex; }
+  .modal {
+    background: var(--card);
+    border-radius: 18px;
+    padding: 18px;
+    width: min(480px, 100%);
+    box-shadow: var(--shadow);
+  }
+  .modal h2 { margin: 0 0 14px; font-size: 18px; }
+  @media (max-width: 600px) {
+    .app { padding: 14px 10px 30px; }
+    h1 { font-size: 24px; }
+    .summary { grid-template-columns: 1fr; }
+    .expense-row {
+      grid-template-columns: 28px minmax(0, 1fr) auto;
+    }
+    .amount-cell { grid-column: 2 / -1; }
+    .row-actions { grid-column: 2 / -1; }
+    .add-form { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <h1>My Budget Tracker</h1>
+    <p class="subtitle">Track your salary, expenses, and remaining balance. Your changes are saved automatically.</p>
+  </header>
+
+  <section class="card">
+    <h2>Salary</h2>
+    <label for="salary">Monthly Salary</label>
+    <input id="salary" class="money-input" type="number" min="0" step="0.01" placeholder="0.00" inputmode="decimal">
+  </section>
+
+  <section class="card">
+    <h2>Summary</h2>
+    <div class="summary">
+      <div class="summary-box">
+        <div class="label">Salary</div>
+        <div id="salaryDisplay" class="value">₱0.00</div>
+      </div>
+      <div class="summary-box">
+        <div class="label">Total Expenses</div>
+        <div id="expenseDisplay" class="value">₱0.00</div>
+      </div>
+      <div id="balanceBox" class="summary-box balance">
+        <div class="label">Balance</div>
+        <div id="balanceDisplay" class="value">₱0.00</div>
+      </div>
+    </div>
+  </section>
+
+  <section class="card">
+    <div class="toolbar">
+      <h2 style="margin:0">Expenses</h2>
+      <label class="select-all">
+        <input id="selectAll" type="checkbox">
+        Select All
+      </label>
+    </div>
+    <div id="expenseList" class="expense-list"></div>
+    <p class="note">An amount is counted toward Total Expenses only when its checkbox is checked.</p>
+  </section>
+
+  <section class="card">
+    <h2>Add Expense</h2>
+    <div class="add-form">
+      <input id="newName" type="text" placeholder="Expense name">
+      <input id="newAmount" class="money-input" type="number" min="0" step="0.01" placeholder="Amount" inputmode="decimal">
+      <button id="addBtn" class="primary">Add Expense</button>
+    </div>
+  </section>
+
+  <section class="card">
+    <div class="actions">
+      <button id="resetBtn" class="danger">Reset to Defaults</button>
+      <button id="clearBtn" class="secondary">Clear All Expenses</button>
+      <button id="openBackupBtn" class="secondary">Backup &amp; Restore</button>
+    </div>
+    <p class="note">Closing the tab or browser will not erase your saved budget.</p>
+    <p class="note">Created by: <a href="https://www.facebook.com/brxtrsmn" target="_blank">Brixter Semana</a></p>
+  </section>
+</div>
+
+<div id="backupModal" class="modal-overlay">
+  <div class="modal">
+    <h2>Backup &amp; Restore</h2>
+    <div class="actions">
+      <button id="backupBtn" class="primary">Download Backup</button>
+      <label for="restoreInput" class="secondary" style="display:inline-flex;align-items:center;justify-content:center;padding:10px 13px;border-radius:10px;cursor:pointer;font-size:14px;font-weight:700;">
+        Restore Backup
+      </label>
+      <input id="restoreInput" type="file" accept=".json,application/json" style="display:none">
+    </div>
+    <p class="note">Your data is saved automatically on this device. Download a backup if you want your budget to survive deletion of the browser's stored data or moving to another device.</p>
+    <div class="actions" style="margin-top:14px;justify-content:flex-end;">
+      <button id="closeBackupModal" class="secondary">Close</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const STORAGE_KEY = "myBudgetTracker_v2";
+const BACKUP_VERSION = 2;
+
+const defaultExpenses = [
+  { id: crypto.randomUUID(), name: "Transportation", amount: "", checked: false },
+  { id: crypto.randomUUID(), name: "Bills", amount: "", checked: false },
+  { id: crypto.randomUUID(), name: "Groceries", amount: "", checked: false },
+  { id: crypto.randomUUID(), name: "Savings", amount: "", checked: false },
+  { id: crypto.randomUUID(), name: "Other", amount: "", checked: false }
+];
+
+let state = loadState();
+let draggedId = null;
+
+function loadState() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY) || localStorage.getItem(STORAGE_KEY + "_backup");
+    const saved = raw ? JSON.parse(raw) : null;
+    if (saved && Array.isArray(saved.expenses)) {
+      return {
+        salary: Number(saved.salary) || 0,
+        expenses: saved.expenses.map(e => ({
+          id: e.id || crypto.randomUUID(),
+          name: String(e.name ?? "Expense"),
+          amount: (e.amount === "" || e.amount === null || e.amount === undefined) ? "" : (Number(e.amount) || 0),
+          checked: Boolean(e.checked)
+        }))
+      };
+    }
+  } catch (_) {}
+  return { salary: 0, expenses: defaultExpenses.map(e => ({...e})) };
+}
+
+function saveState() {
+  const payload = {
+    version: BACKUP_VERSION,
+    savedAt: new Date().toISOString(),
+    salary: Number(state.salary) || 0,
+    expenses: state.expenses
+  };
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+  localStorage.setItem(STORAGE_KEY + "_backup", JSON.stringify(payload));
+}
+
+function money(value) {
+  return new Intl.NumberFormat("en-PH", {
+    style: "currency",
+    currency: "PHP",
+    minimumFractionDigits: 2
+  }).format(Number(value) || 0);
+}
+
+function render() {
+  const list = document.getElementById("expenseList");
+  list.innerHTML = "";
+
+  if (state.expenses.length === 0) {
+    list.innerHTML = '<div class="empty">No expenses yet. Add one below.</div>';
+  }
+
+  state.expenses.forEach(exp => {
+    const row = document.createElement("div");
+    row.className = "expense-row" + (exp.checked ? " checked" : "");
+    row.draggable = true;
+    row.addEventListener("dragstart", e => {
+      draggedId = exp.id;
+      e.dataTransfer.effectAllowed = "move";
+      row.classList.add("dragging");
+    });
+    row.addEventListener("dragend", () => {
+      row.classList.remove("dragging");
+      draggedId = null;
+    });
+    row.addEventListener("dragover", e => {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = "move";
+      row.classList.add("drag-over");
+    });
+    row.addEventListener("dragleave", () => row.classList.remove("drag-over"));
+    row.addEventListener("drop", e => {
+      e.preventDefault();
+      row.classList.remove("drag-over");
+      if (draggedId === null || draggedId === exp.id) return;
+      const from = state.expenses.findIndex(x => x.id === draggedId);
+      const to = state.expenses.findIndex(x => x.id === exp.id);
+      if (from < 0 || to < 0) return;
+      const [moved] = state.expenses.splice(from, 1);
+      state.expenses.splice(to, 0, moved);
+      saveState();
+      render();
+    });
+
+    const checkbox = document.createElement("input");
+    checkbox.type = "checkbox";
+    checkbox.className = "expense-check";
+    checkbox.checked = exp.checked;
+    checkbox.setAttribute("aria-label", "Select " + exp.name);
+    checkbox.addEventListener("change", () => {
+      exp.checked = checkbox.checked;
+      saveState();
+      render();
+    });
+
+    const name = document.createElement("div");
+    name.className = "expense-name";
+    name.textContent = exp.name;
+
+    const amountCell = document.createElement("div");
+    amountCell.className = "amount-cell";
+
+    if (exp.checked) {
+      const currency = document.createElement("span");
+      currency.className = "currency";
+      currency.textContent = "₱";
+
+      const amount = document.createElement("input");
+      amount.type = "number";
+      amount.min = "0";
+      amount.step = "0.01";
+      amount.inputMode = "decimal";
+      amount.value = (exp.amount === "" || Number(exp.amount) === 0) ? "" : exp.amount;
+      amount.title = "Update amount";
+      amount.addEventListener("input", () => {
+        exp.amount = amount.value === "" ? "" : Math.max(0, Number(amount.value) || 0);
+        saveState();
+        updateSummary();
+      });
+      amount.addEventListener("change", () => {
+        exp.amount = amount.value === "" ? "" : Math.max(0, Number(amount.value) || 0);
+        saveState();
+        render();
+      });
+
+      amountCell.append(currency, amount);
+    } else {
+      const hidden = document.createElement("span");
+      hidden.className = "hidden-amount";
+      hidden.textContent = "Amount hidden";
+      amountCell.appendChild(hidden);
+    }
+
+    const actions = document.createElement("div");
+    actions.className = "row-actions";
+
+    const rename = document.createElement("button");
+    rename.className = "secondary";
+    rename.textContent = "Rename";
+    rename.addEventListener("click", () => {
+      const next = prompt("Enter a new name:", exp.name);
+      if (next !== null && next.trim()) {
+        exp.name = next.trim();
+        saveState();
+        render();
+      }
+    });
+
+    const remove = document.createElement("button");
+    remove.className = "danger";
+    remove.textContent = "Delete";
+    remove.addEventListener("click", () => {
+      state.expenses = state.expenses.filter(x => x.id !== exp.id);
+      saveState();
+      render();
+    });
+
+    actions.append(rename, remove);
+    row.append(checkbox, name, amountCell, actions);
+    list.appendChild(row);
+  });
+
+  const allChecked = state.expenses.length > 0 && state.expenses.every(e => e.checked);
+  const anyChecked = state.expenses.some(e => e.checked);
+  const selectAll = document.getElementById("selectAll");
+  selectAll.checked = allChecked;
+  selectAll.indeterminate = !allChecked && anyChecked;
+
+  document.getElementById("salary").value = state.salary || "";
+  updateSummary();
+}
+
+function updateSummary() {
+  const total = state.expenses
+    .filter(e => e.checked)
+    .reduce((sum, e) => sum + (e.amount === "" ? 0 : (Number(e.amount) || 0)), 0);
+  const balance = (Number(state.salary) || 0) - total;
+
+  document.getElementById("salaryDisplay").textContent = money(state.salary);
+  document.getElementById("expenseDisplay").textContent = money(total);
+  document.getElementById("balanceDisplay").textContent = money(balance);
+
+  const box = document.getElementById("balanceBox");
+  box.classList.toggle("negative", balance < 0);
+}
+
+document.getElementById("salary").addEventListener("input", e => {
+  state.salary = Math.max(0, Number(e.target.value) || 0);
+  saveState();
+  updateSummary();
+});
+
+document.getElementById("selectAll").addEventListener("change", e => {
+  state.expenses.forEach(exp => exp.checked = e.target.checked);
+  saveState();
+  render();
+});
+
+document.getElementById("addBtn").addEventListener("click", () => {
+  const nameInput = document.getElementById("newName");
+  const amountInput = document.getElementById("newAmount");
+  const name = nameInput.value.trim();
+  const amount = Math.max(0, Number(amountInput.value) || 0);
+
+  if (!name) {
+    alert("Please enter an expense name.");
+    nameInput.focus();
+    return;
+  }
+
+  state.expenses.push({
+    id: crypto.randomUUID(),
+    name,
+    amount,
+    checked: false
+  });
+
+  nameInput.value = "";
+  amountInput.value = "";
+  saveState();
+  render();
+  nameInput.focus();
+});
+
+document.getElementById("resetBtn").addEventListener("click", () => {
+  if (!confirm("Reset salary and restore the default expense list?")) return;
+  state = {
+    salary: 0,
+    expenses: defaultExpenses.map(e => ({...e, id: crypto.randomUUID()}))
+  };
+  saveState();
+  render();
+});
+
+document.getElementById("clearBtn").addEventListener("click", () => {
+  if (!confirm("Remove every expense from the list?")) return;
+  state.expenses = [];
+  saveState();
+  render();
+});
+
+const backupModal = document.getElementById("backupModal");
+document.getElementById("openBackupBtn").addEventListener("click", () => backupModal.classList.add("open"));
+document.getElementById("closeBackupModal").addEventListener("click", () => backupModal.classList.remove("open"));
+backupModal.addEventListener("click", (e) => {
+  if (e.target === backupModal) backupModal.classList.remove("open");
+});
+
+document.getElementById("backupBtn").addEventListener("click", () => {
+  const payload = {
+    app: "My Budget Tracker",
+    version: BACKUP_VERSION,
+    exportedAt: new Date().toISOString(),
+    salary: Number(state.salary) || 0,
+    expenses: state.expenses
+  };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], {type: "application/json"});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  const date = new Date().toISOString().slice(0,10);
+  a.href = url;
+  a.download = `my-budget-tracker-backup-${date}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+});
+
+document.getElementById("restoreInput").addEventListener("change", async (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  try {
+    const text = await file.text();
+    const data = JSON.parse(text);
+    if (!Array.isArray(data.expenses)) throw new Error("Invalid backup");
+    state = {
+      salary: Number(data.salary) || 0,
+      expenses: data.expenses.map(exp => ({
+        id: exp.id || crypto.randomUUID(),
+        name: String(exp.name || "Expense"),
+        amount: exp.amount === "" || exp.amount === null || exp.amount === undefined
+          ? "" : Math.max(0, Number(exp.amount) || 0),
+        checked: Boolean(exp.checked)
+      }))
+    };
+    saveState();
+    render();
+    alert("Backup restored successfully.");
+  } catch (_) {
+    alert("That file is not a valid My Budget Tracker backup.");
+  }
+  e.target.value = "";
+});
+
+render();
+</script>
+</body>
+</html>
