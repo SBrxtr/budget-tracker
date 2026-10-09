@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Grocery Guide</title>
+<style>
+  :root {
+    --bg: #f4f7fb;
+    --card: #ffffff;
+    --text: #172033;
+    --muted: #697386;
+    --line: #e4e8ef;
+    --primary: #2563eb;
+    --primary-dark: #1d4ed8;
+    --danger: #dc2626;
+    --success: #16803c;
+    --shadow: 0 8px 25px rgba(23,32,51,.08);
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    background: var(--bg);
+    color: var(--text);
+  }
+  .app { width: min(860px, 100%); margin: 0 auto; padding: 20px 14px 60px; }
+  header { margin-bottom: 16px; }
+  h1 { margin: 0 0 5px; font-size: 26px; }
+  .subtitle { margin: 0; color: var(--muted); }
+  .card {
+    background: var(--card);
+    border-radius: 16px;
+    padding: 16px;
+    margin-bottom: 14px;
+    box-shadow: var(--shadow);
+  }
+  .card h2 { margin: 0 0 12px; font-size: 17px; }
+  button {
+    border: 0;
+    border-radius: 10px;
+    padding: 10px 14px;
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+  }
+  .primary { background: var(--primary); color: white; }
+  .primary:hover { background: var(--primary-dark); }
+  .secondary { background: #eef2f7; color: var(--text); }
+  .store-row { display: flex; gap: 8px; flex-wrap: wrap; }
+  .store-btn { background: #eef2f7; color: var(--text); }
+  .store-btn.active { background: var(--primary); color: #fff; }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th, td { text-align: left; padding: 9px 8px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+  th { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .03em; }
+  td.price, th.price { text-align: right; }
+  td.qty, th.qty { text-align: center; width: 80px; }
+  td.qty input {
+    width: 62px;
+    padding: 7px 6px;
+    text-align: center;
+    border: 1px solid var(--line);
+    border-radius: 9px;
+    font-size: 14px;
+  }
+  .total-row {
+    display: flex;
+    justify-content: flex-end;
+    font-weight: 800;
+    font-size: 17px;
+    padding-top: 12px;
+  }
+  .add-form { display: grid; grid-template-columns: 1fr 1fr 1fr 110px auto; gap: 8px; }
+  input, select {
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 10px 11px;
+    font-size: 14px;
+    outline: none;
+    width: 100%;
+  }
+  input:focus { border-color: var(--primary); }
+  .note { color: var(--muted); font-size: 12px; margin: 10px 0 0; }
+  .empty { color: var(--muted); text-align: center; padding: 14px 0; }
+  @media (max-width: 640px) {
+    .add-form { grid-template-columns: 1fr 1fr; }
+    .add-form button { grid-column: 1 / -1; }
+    table { font-size: 13px; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <h1>🛒 Grocery Guide</h1>
+    <p class="subtitle">Compare products and prices across your usual grocery stores.</p>
+    <p style="margin:10px 0 0"><a href="../index.html" class="secondary" style="text-decoration:none;display:inline-block;padding:9px 14px;border-radius:10px;font-weight:700;font-size:14px">← Back to Home</a></p>
+  </header>
+
+  <section class="card">
+    <h2>Grocery Stores</h2>
+    <div id="storeButtons" class="store-row"></div>
+    <p class="note" id="statusNote">Loading stores...</p>
+  </section>
+
+  <section class="card">
+    <h2 id="storeTitle">Products</h2>
+    <div style="margin-bottom:10px;display:flex;gap:8px;flex-wrap:wrap">
+      <select id="sortSelect" style="max-width:230px">
+        <option value="default">Sort: Default</option>
+        <option value="name-asc">Name: A → Z</option>
+        <option value="name-desc">Name: Z → A</option>
+        <option value="price-asc">Price: Low → High</option>
+        <option value="price-desc">Price: High → Low</option>
+      </select>
+      <input id="searchInput" type="search" placeholder="🔍 Search products..." style="max-width:260px">
+    </div>
+    <div style="overflow:auto;max-height:420px">
+      <table>
+        <thead>
+          <tr>
+            <th>Product</th>
+            <th>Variation</th>
+            <th>Details</th>
+            <th class="price">Price</th>
+            <th class="qty">Qty</th>
+            <th class="price">Total</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="productRows"></tbody>
+      </table>
+    </div>
+    <div class="total-row">Total: <span id="totalDisplay" style="margin-left:8px">₱0.00</span></div>
+  </section>
+
+  <section class="card">
+    <h2>Add Product to Selected Store</h2>
+    <div class="add-form">
+      <input id="addProduct" type="text" placeholder="Product">
+      <input id="addVariation" type="text" placeholder="Variation">
+      <input id="addDetails" type="text" placeholder="Details (g, mL, pcs)">
+      <input id="addPrice" type="number" min="0" step="0.01" placeholder="Price">
+      <button id="addProductBtn" class="primary">Add</button>
+    </div>
+    <p class="note">Added products are saved on this device and merged with your Google Sheet data.</p>
+  </section>
+</div>
+
+<div id="modalOverlay" class="modal-overlay" style="position:fixed;inset:0;background:rgba(23,32,51,.5);display:none;align-items:center;justify-content:center;padding:16px;z-index:100">
+  <div style="background:#fff;border-radius:16px;padding:18px;width:100%;max-width:380px;box-shadow:var(--shadow)">
+    <h2 id="modalTitle" style="margin:0 0 12px;font-size:17px">Notice</h2>
+    <input id="modalInput" type="text" style="display:none;margin-bottom:12px" placeholder="Store name">
+    <p id="modalText" style="margin:0 0 14px;color:var(--muted)"></p>
+    <div style="display:flex;gap:8px;justify-content:flex-end">
+      <button id="modalConfirm" class="primary" style="display:none">Add</button>
+      <button id="modalClose" class="secondary">Close</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQZr8fmMglqRtUV3URspAiVYG3z8bmIrAAObmKr4YWWPoBmyB-Ev0Y2LhKR4KbXkneZAjKqjaNJqpyI/pub?gid=1349480710&single=true&output=csv";
+const LOCAL_KEY = "groceryGuide_local";
+
+let sheetRows = [];       // parsed rows from Google Sheet
+let customStores = [];    // user-added stores
+let customProducts = [];  // user-added products (merged with sheet rows)
+let quantities = {};      // rowId -> qty
+let overrides = {};       // rowId -> {product, variation, details, price}
+let deletedIds = [];      // rowIds removed by the user
+// ---------- Popup modal ----------
+const modalOverlay = document.getElementById("modalOverlay");
+const modalTitle = document.getElementById("modalTitle");
+const modalText = document.getElementById("modalText");
+const modalInput = document.getElementById("modalInput");
+const modalConfirm = document.getElementById("modalConfirm");
+
+function showMessage(text, title) {
+  modalTitle.textContent = title || "Notice";
+  modalText.textContent = text;
+  modalInput.style.display = "none";
+  modalConfirm.style.display = "none";
+  modalOverlay.style.display = "flex";
+}
+function promptStore(onSubmit) {
+  modalTitle.textContent = "Add Store";
+  modalText.textContent = "Enter a new grocery store name:";
+  modalInput.style.display = "block";
+  modalInput.value = "";
+  modalConfirm.style.display = "inline-block";
+  modalConfirm.onclick = () => {
+    const v = modalInput.value.trim();
+    modalOverlay.style.display = "none";
+    if (v) onSubmit(v);
+  };
+  modalOverlay.style.display = "flex";
+  modalInput.focus();
+}
+document.getElementById("modalClose").addEventListener("click", () => modalOverlay.style.display = "none");
+modalOverlay.addEventListener("click", e => { if (e.target === modalOverlay) modalOverlay.style.display = "none"; });
+
+let sortMode = "default";
+let searchTerm = "";
+let currentStore = null;
+
+// ---------- Local storage ----------
+function loadLocal() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(LOCAL_KEY) || "{}");
+    customStores = saved.customStores || [];
+    customProducts = saved.customProducts || [];
+    quantities = saved.quantities || {};
+    overrides = saved.overrides || {};
+    deletedIds = saved.deletedIds || [];
+    sortMode = saved.sortMode || "default";
+  } catch (_) {}
+}
+function saveLocal() {
+  localStorage.setItem(LOCAL_KEY, JSON.stringify({ customStores, customProducts, quantities, overrides, deletedIds, sortMode }));
+}
+
+// ---------- CSV parsing ----------
+function parseCSV(text) {
+  const rows = [];
+  let row = [], cell = "", inQuotes = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (inQuotes) {
+      if (c === '"') {
+        if (text[i + 1] === '"') { cell += '"'; i++; }
+        else inQuotes = false;
+      } else cell += c;
+    } else if (c === '"') inQuotes = true;
+    else if (c === ",") { row.push(cell); cell = ""; }
+    else if (c === "\n" || c === "\r") {
+      if (c === "\r" && text[i + 1] === "\n") i++;
+      row.push(cell); cell = "";
+      if (row.some(v => v.trim() !== "")) rows.push(row);
+      row = [];
+    } else cell += c;
+  }
+  if (cell !== "" || row.length) { row.push(cell); if (row.some(v => v.trim() !== "")) rows.push(row); }
+  return rows;
+}
+
+// ---------- Data ----------
+async function loadSheet() {
+  const note = document.getElementById("statusNote");
+  try {
+    const res = await fetch(SHEET_CSV_URL + "&_=" + Date.now(), { cache: "no-store" });
+    if (!res.ok) throw new Error("bad status");
+    const rows = parseCSV(await res.text());
+    if (!rows.length) throw new Error("empty");
+    const header = rows[0].map(h => h.trim().toUpperCase());
+    const idx = name => header.indexOf(name);
+    const iProduct = idx("PRODUCT"), iVar = idx("VARIATION"), iDet = idx("DETAILS"),
+          iPrice = idx("PRICE"), iStore = idx("STORE");
+    sheetRows = rows.slice(1)
+      .map((r, i) => ({
+        id: "sheet-" + i,
+        product: (r[iProduct] || "").trim(),
+        variation: (r[iVar] || "").trim(),
+        details: (r[iDet] || "").trim(),
+        price: parseFloat((r[iPrice] || "0").replace(/[₱,]/g, "")) || 0,
+        store: (r[iStore] || "").trim()
+      }))
+      .filter(r => r.product && r.store);
+    note.textContent = `Synced from Google Sheet — ${sheetRows.length} products loaded.`;
+  } catch (e) {
+    note.textContent = "Could not load the Google Sheet. Check your published link/internet.";
+  }
+  renderStores();
+  renderProducts();
+}
+
+function allStores() {
+  const fromSheet = [...new Set(sheetRows.map(r => r.store))];
+  return [...new Set([...fromSheet, ...customStores])];
+}
+
+function productsFor(store) {
+  return [
+    ...sheetRows.filter(r => r.store === store),
+    ...customProducts.filter(r => r.store === store)
+  ].filter(r => !deletedIds.includes(r.id))
+   .map(r => (overrides[r.id] ? { ...r, ...overrides[r.id] } : r));
+}
+
+function sortRows(rows) {
+  const copy = [...rows];
+  switch (sortMode) {
+    case "name-asc": return copy.sort((a, b) => a.product.localeCompare(b.product));
+    case "name-desc": return copy.sort((a, b) => b.product.localeCompare(a.product));
+    case "price-asc": return copy.sort((a, b) => a.price - b.price);
+    case "price-desc": return copy.sort((a, b) => b.price - a.price);
+    default: return copy;
+  }
+}
+
+// ---------- Rendering ----------
+function renderStores() {
+  const wrap = document.getElementById("storeButtons");
+  wrap.innerHTML = "";
+  const stores = allStores();
+  if (!currentStore && stores.length) currentStore = stores[0];
+  stores.forEach(s => {
+    const b = document.createElement("button");
+    b.className = "store-btn" + (s === currentStore ? " active" : "");
+    b.textContent = s;
+    b.addEventListener("click", () => { currentStore = s; renderStores(); renderProducts(); });
+    wrap.appendChild(b);
+  });
+  const add = document.createElement("button");
+  add.className = "secondary";
+  add.textContent = "+ Add Store";
+  add.addEventListener("click", () => {
+    promptStore((n) => {
+      if (!allStores().includes(n)) customStores.push(n);
+      currentStore = n;
+      saveLocal();
+      renderStores();
+      renderProducts();
+    });
+  });
+  wrap.appendChild(add);
+}
+
+function renderProducts() {
+  const tbody = document.getElementById("productRows");
+  document.getElementById("storeTitle").textContent = currentStore ? `Products — ${currentStore}` : "Products";
+  tbody.innerHTML = "";
+  if (!currentStore) {
+    tbody.innerHTML = '<tr><td colspan="7" class="empty">Select a store.</td></tr>';
+    updateTotal();
+    return;
+  }
+  const rows = sortRows(productsFor(currentStore)).filter(r => {
+    const t = searchTerm.trim().toLowerCase();
+    if (!t) return true;
+    return r.product.toLowerCase().includes(t)
+        || r.variation.toLowerCase().includes(t)
+        || r.details.toLowerCase().includes(t);
+  });
+  if (!rows.length) {
+    tbody.innerHTML = '<tr><td colspan="7" class="empty">No products found.</td></tr>';
+  }
+  rows.forEach((r) => {
+    const tr = document.createElement("tr");
+    const qty = quantities[r.id] ?? "";
+    tr.innerHTML = `
+      <td><input type="text" value="${escapeHtml(r.product)}" data-id="${r.id}" data-field="product"></td>
+      <td><input type="text" value="${escapeHtml(r.variation)}" data-id="${r.id}" data-field="variation"></td>
+      <td><input type="text" value="${escapeHtml(r.details)}" data-id="${r.id}" data-field="details"></td>
+      <td class="price"><input type="number" min="0" step="0.01" style="text-align:right" value="${r.price}" data-id="${r.id}" data-field="price"></td>
+      <td class="qty"><input type="number" min="0" step="1" class="qty-input" value="${qty}" data-id="${r.id}" data-price="${r.price}"></td>
+      <td class="price row-total">₱${((Number(qty) || 0) * r.price).toFixed(2)}</td>
+      <td><button class="danger del-btn" style="padding:8px 10px;display:inline-flex;align-items:center" title="Delete" aria-label="Delete ${escapeHtml(r.product)}"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button></td>`;
+    tbody.appendChild(tr);
+  });
+  tbody.querySelectorAll("input[data-field]").forEach(inp => {
+    inp.addEventListener("change", () => {
+      const id = inp.dataset.id, field = inp.dataset.field;
+      const current = overrides[id] || {};
+      current[field] = field === "price" ? Math.max(0, Number(inp.value) || 0) : inp.value;
+      overrides[id] = current;
+      // also update custom product in place
+      const cp = customProducts.find(p => p.id === id);
+      if (cp) cp[field] = current[field];
+      saveLocal();
+      renderProducts();
+    });
+  });
+  tbody.querySelectorAll("input.qty-input").forEach(inp => {
+    inp.addEventListener("input", () => {
+      quantities[inp.dataset.id] = inp.value;
+      saveLocal();
+      const rowTotal = inp.closest("tr").querySelector(".row-total");
+      if (rowTotal) rowTotal.textContent = "₱" + ((Number(inp.value) || 0) * (Number(inp.dataset.price) || 0)).toFixed(2);
+      updateTotal();
+    });
+  });
+  tbody.querySelectorAll(".del-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const id = btn.closest("tr").querySelector("input[data-field]").dataset.id;
+      deletedIds.push(id);
+      customProducts = customProducts.filter(p => p.id !== id);
+      saveLocal();
+      renderProducts();
+    });
+  });
+  updateTotal();
+}
+
+function updateTotal() {
+  let total = 0;
+  document.querySelectorAll("#productRows input.qty-input").forEach(inp => {
+    const q = Number(inp.value) || 0;
+    total += q * (Number(inp.dataset.price) || 0);
+  });
+  document.getElementById("totalDisplay").textContent =
+    "₱" + total.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+
+document.getElementById("addProductBtn").addEventListener("click", () => {
+  const product = document.getElementById("addProduct").value.trim();
+  const variation = document.getElementById("addVariation").value.trim();
+  const details = document.getElementById("addDetails").value.trim();
+  const price = Math.max(0, Number(document.getElementById("addPrice").value) || 0);
+  if (!product) { showMessage("Please enter a product name.", "Missing info"); return; }
+  if (!currentStore) { showMessage("Please select a store first.", "No store selected"); return; }
+  customProducts.push({ id: "local-" + Date.now() + "-" + Math.floor(Math.random() * 1000), product, variation, details, price, store: currentStore });
+  saveLocal();
+  document.getElementById("addProduct").value = "";
+  document.getElementById("addVariation").value = "";
+  document.getElementById("addDetails").value = "";
+  document.getElementById("addPrice").value = "";
+  renderProducts();
+});
+
+document.getElementById("searchInput").addEventListener("input", e => {
+  searchTerm = e.target.value;
+  renderProducts();
+});
+loadLocal();
+document.getElementById("sortSelect").value = sortMode;
+document.getElementById("sortSelect").addEventListener("change", e => {
+  sortMode = e.target.value;
+  saveLocal();
+  renderProducts();
+});
+
+loadSheet();
+</script>
+</body>
+</html>
