@@ -494,7 +494,7 @@ async function loadSheet() {
           };
         })
         .filter(r => r.product && r.store);
-      note.textContent = `Live database — ${sheetRows.length} products synced from Google Sheets.`;
+      note.textContent = `Live database — ${sheetRows.length} products synced from database.`;
     } catch (e) {
       note.textContent = `Could not reach the live database — using the built-in default list (${sheetRows.length} products).`;
     }
