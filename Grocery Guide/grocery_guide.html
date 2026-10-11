@@ -1,0 +1,1007 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Grocery Guide</title>
+<style>
+  :root {
+    --bg: #f4f7fb;
+    --card: #ffffff;
+    --text: #172033;
+    --muted: #697386;
+    --line: #e4e8ef;
+    --primary: #2563eb;
+    --primary-dark: #1d4ed8;
+    --danger: #dc2626;
+    --success: #16803c;
+    --shadow: 0 8px 25px rgba(23,32,51,.08);
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    background: var(--bg);
+    color: var(--text);
+  }
+  .app { width: min(860px, 100%); margin: 0 auto; padding: 20px 14px 60px; }
+  header { margin-bottom: 16px; }
+  h1 { margin: 0 0 5px; font-size: 26px; }
+  .subtitle { margin: 0; color: var(--muted); }
+  .card {
+    background: var(--card);
+    border-radius: 16px;
+    padding: 16px;
+    margin-bottom: 14px;
+    box-shadow: var(--shadow);
+  }
+  .card h2 { margin: 0 0 12px; font-size: 17px; }
+  button {
+    border: 0;
+    border-radius: 10px;
+    padding: 10px 14px;
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+  }
+  .primary { background: var(--primary); color: white; }
+  .primary:hover { background: var(--primary-dark); }
+  .secondary { background: #eef2f7; color: var(--text); }
+  .store-row { display: flex; gap: 8px; flex-wrap: wrap; }
+  .store-btn { background: #eef2f7; color: var(--text); position: relative; }
+  .store-btn.active { color: #fff; }
+  .color-pop {
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 0;
+    background: #fff;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    box-shadow: var(--shadow);
+    padding: 10px 12px;
+    z-index: 50;
+    display: none;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text);
+  }
+  .color-pop.open { display: flex; }
+  .color-pop input[type=color] { width: 34px; height: 28px; border: 0; padding: 0; background: none; cursor: pointer; }
+  .store-btn.dragging { opacity: .5; }
+  .store-btn.drag-over { outline: 2px dashed var(--primary); outline-offset: 2px; }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th, td { text-align: left; padding: 9px 8px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+  th { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .03em; }
+  td.price, th.price { text-align: right; }
+  td.qty, th.qty { text-align: center; width: 104px; min-width: 104px; max-width: 104px; }
+  th.total, td.row-total { min-width: 92px; width: 92px; }
+  td.qty input {
+    width: 62px;
+    padding: 7px 6px;
+    text-align: center;
+    border: 1px solid var(--line);
+    border-radius: 9px;
+    font-size: 14px;
+  }
+  .total-row {
+    display: flex;
+    justify-content: flex-end;
+    font-weight: 800;
+    font-size: 17px;
+    padding-top: 12px;
+  }
+  .add-form { display: grid; grid-template-columns: 1fr 1fr 1fr 110px auto; gap: 8px; }
+  input, select {
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 10px 11px;
+    font-size: 14px;
+    outline: none;
+    width: 100%;
+  }
+  input:focus { border-color: var(--primary); }
+  input[type=number]::-webkit-outer-spin-button,
+  input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+  input[type=number] { -moz-appearance: textfield; appearance: textfield; }
+  .note { color: var(--muted); font-size: 12px; margin: 10px 0 0; }
+  .cell-label { font-size: 13px; min-width: 0; overflow-wrap: anywhere; }
+  .empty { color: var(--muted); text-align: center; padding: 14px 0; }
+  .cart-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--primary);
+    color: #fff;
+    border: 0;
+    border-radius: 10px;
+    padding: 9px 13px;
+    font-size: 15px;
+    cursor: pointer;
+    position: relative;
+  }
+  .cart-toggle:hover { background: var(--primary-dark); }
+  .cart-count {
+    background: #fff;
+    color: var(--primary);
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 800;
+    min-width: 20px;
+    height: 20px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 5px;
+  }
+  .cart-sidebar {
+    position: fixed;
+    top: 0;
+    right: -380px;
+    width: 350px;
+    max-width: 92vw;
+    height: 100vh;
+    background: #fff;
+    box-shadow: -10px 0 30px rgba(23,32,51,.15);
+    z-index: 90;
+    transition: right .25s ease;
+    display: flex;
+    flex-direction: column;
+  }
+  .cart-sidebar.open { right: 0; }
+  .cart-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 14px 16px;
+    border-bottom: 1px solid var(--line);
+  }
+  .cart-header h2 { margin: 0; font-size: 17px; flex: 1; }
+  .cart-header select { width: auto; padding: 7px 9px; font-size: 12px; }
+  .cart-close { background: #eef2f7; border: 0; border-radius: 8px; width: 32px; height: 32px; font-size: 18px; cursor: pointer; line-height: 1; }
+  .cart-items { flex: 1; overflow-y: auto; padding: 10px 12px; }
+  .cart-group-label {
+    color: var(--muted);
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .03em;
+    margin: 12px 4px 6px;
+    display: flex;
+    justify-content: space-between;
+    cursor: pointer;
+    user-select: none;
+  }
+  .cart-group-label .cart-toggle { font-size: 10px; margin-right: 6px; }
+  .cart-group-label.dragging { opacity: .5; }
+  .cart-group-label.drag-over { color: var(--primary); }
+  .cart-item {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto auto auto;
+    gap: 8px;
+    align-items: center;
+    border: 1px solid var(--line);
+    border-radius: 11px;
+    padding: 8px 10px;
+    margin-bottom: 7px;
+    background: #fff;
+    cursor: grab;
+  }
+  .cart-item.dragging { opacity: .5; }
+  .cart-item.drag-over { border-color: var(--primary); }
+  .cart-item .drag-handle { color: var(--muted); font-size: 15px; cursor: grab; }
+  .cart-item .ci-name { font-weight: 700; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .cart-item .ci-meta { color: var(--muted); font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .cart-item .ci-qty { width: 52px; flex-shrink: 0; text-align: center; border: 1px solid var(--line); border-radius: 8px; padding: 5px 4px; font-size: 13px; }
+  .cart-item .ci-price { font-weight: 800; font-size: 13px; white-space: nowrap; }
+  .cart-item .ci-del { background: none; border: 0; color: var(--danger); cursor: pointer; padding: 4px; display: inline-flex; }
+  .cart-summary { border-top: 1px solid var(--line); padding: 12px 16px; }
+  .cart-summary .row { display: flex; justify-content: space-between; font-size: 13px; color: var(--muted); padding: 2px 0; }
+  .cart-summary .row.total { font-weight: 800; font-size: 16px; color: var(--text); border-top: 1px solid var(--line); margin-top: 6px; padding-top: 8px; }
+  .add-cart-btn { background: #e8f0fe; border: 0; border-radius: 8px; padding: 6px 8px; cursor: pointer; display: inline-flex; align-items: center; color: var(--primary); }
+  .add-cart-btn:hover { background: #d3e3fd; }
+  .add-cart-btn.added { background: #dcfce7; color: var(--success); }
+  .stepper { display: inline-flex; align-items: center; gap: 4px; justify-content: center; }
+  .step-btn {
+    width: 24px;
+    height: 24px;
+    border: 1px solid var(--line);
+    background: #fff;
+    border-radius: 7px;
+    font-size: 14px;
+    font-weight: 800;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    color: var(--text);
+    line-height: 1;
+  }
+  .step-btn:hover { background: #eef2f7; }
+  .stepper .qty-input { width: 40px; padding: 5px 2px; }
+  .ci-stepper { display: inline-flex; align-items: center; gap: 3px; }
+  @media (max-width: 640px) {
+    .add-form { grid-template-columns: 1fr 1fr; }
+    .add-form button { grid-column: 1 / -1; }
+    table { font-size: 13px; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <h1>🛒 Grocery Guide</h1>
+    <p class="subtitle">Compare products and prices across your usual grocery stores.</p>
+    <p style="margin:10px 0 0"><a href="../index.html" class="secondary" style="text-decoration:none;display:inline-block;padding:9px 14px;border-radius:10px;font-weight:700;font-size:14px">← Back to Home</a></p>
+  </header>
+
+  <section class="card">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+      <h2 style="margin:0">Grocery Stores</h2>
+      <button id="cartToggleBtn" class="cart-toggle" title="View Cart">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>
+        <span id="cartCount" class="cart-count">0</span>
+      </button>
+    </div>
+    <div id="storeButtons" class="store-row"></div>
+    <p class="note" id="statusNote">Loading stores...</p>
+  </section>
+
+  <section class="card">
+    <h2 id="storeTitle">Products</h2>
+    <div style="margin-bottom:10px;display:flex;gap:8px;flex-wrap:wrap">
+      <select id="sortSelect" style="max-width:230px">
+        <option value="default">Sort: Default</option>
+        <option value="name-asc">Name: A → Z</option>
+        <option value="name-desc">Name: Z → A</option>
+        <option value="price-asc">Price: Low → High</option>
+        <option value="price-desc">Price: High → Low</option>
+      </select>
+      <input id="searchInput" type="search" placeholder="🔍 Search products..." style="max-width:260px">
+    </div>
+    <div style="overflow:auto;max-height:420px">
+      <table>
+        <thead>
+          <tr>
+            <th>Product</th>
+            <th>Variation</th>
+            <th>Details</th>
+            <th class="price">Price</th>
+            <th class="qty">Qty</th>
+            <th class="price total">Total</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="productRows"></tbody>
+      </table>
+    </div>
+    <div class="total-row">Total: <span id="totalDisplay" style="margin-left:8px">₱0.00</span></div>
+  </section>
+
+</div>
+
+<div id="cartSidebar" class="cart-sidebar">
+  <div class="cart-header">
+    <h2>🛒 Cart</h2>
+    <select id="cartSort" title="Sort cart">
+      <option value="default">Sort: Default</option>
+      <option value="name-asc">Name: A → Z</option>
+      <option value="store-asc">Store: A → Z</option>
+    </select>
+    <button id="cartCloseBtn" class="cart-close" title="Close">×</button>
+  </div>
+  <div id="cartItems" class="cart-items"></div>
+  <div id="cartSummary" class="cart-summary"></div>
+</div>
+
+<div id="modalOverlay" class="modal-overlay" style="position:fixed;inset:0;background:rgba(23,32,51,.5);display:none;align-items:center;justify-content:center;padding:16px;z-index:100">
+  <div style="background:#fff;border-radius:16px;padding:18px;width:100%;max-width:380px;box-shadow:var(--shadow)">
+    <h2 id="modalTitle" style="margin:0 0 12px;font-size:17px">Notice</h2>
+    <input id="modalInput" type="text" style="display:none;margin-bottom:12px" placeholder="Store name">
+    <p id="modalText" style="margin:0 0 14px;color:var(--muted)"></p>
+    <div style="display:flex;gap:8px;justify-content:flex-end">
+      <button id="modalConfirm" class="primary" style="display:none">Add</button>
+      <button id="modalClose" class="secondary">Close</button>
+    </div>
+  </div>
+</div>
+
+<script src="defaults.js"></script>
+<script>
+const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzFN8ouva6d8PAZlhVpNNIYQ56kh0sp8WT2X-g_sis8oZoEmqPj_y7jBOs6sa-qepLU/exec";
+const SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQZr8fmMglqRtUV3URspAiVYG3z8bmIrAAObmKr4YWWPoBmyB-Ev0Y2LhKR4KbXkneZAjKqjaNJqpyI/pub?gid=1349480710&single=true&output=csv";
+const LOCAL_KEY = "groceryGuide_local";
+const ONLINE = Boolean(APPS_SCRIPT_URL);
+
+// Sheet store names -> display names used on the buttons
+const STORE_DISPLAY = {
+  "Jaks": "JaksMart",
+  "Maligaya": "Maligaya Mart",
+  "Frozen Goods - Kasiglahan": "Frozen Goods-Kasig"
+};
+const STORE_CANONICAL = {
+  "JaksMart": "Jaks",
+  "Maligaya Mart": "Maligaya",
+  "Frozen Goods-Kasig": "Frozen Goods - Kasiglahan"
+};
+
+// Default store button colors (per-user customizable, these always apply unless changed)
+const DEFAULT_STORE_COLORS = {
+  "JaksMart": "#60a5fa",
+  "O-Save": "#f87171",
+  "Maligaya Mart": "#facc15",
+  "Puregold": "#4ade80",
+  "Frozen Goods - Kasig": "#fb923c"
+};
+
+let sheetRows = DEFAULT_PRODUCTS.map((r, i) => ({ id: "default-" + i, ...r })); // built-in default list
+let customStores = [...DEFAULT_STORES];    // user-added stores
+let customProducts = [];  // user-added products (merged with sheet rows)
+let quantities = {};      // rowId -> qty
+let overrides = {};       // rowId -> {product, variation, details, price}
+let deletedIds = [];      // rowIds removed by the user
+let storeColors = {};     // store name -> custom button color
+let deletedStores = [];   // hidden built-in/sheet stores
+let storeOrder = [];      // user's preferred button order
+let draggedStore = null;
+let cartItems = [];       // products added to the cart
+let draggedCartId = null;
+let collapsedStores = new Set(); // collapsed store groups in the cart
+let draggedGroup = null;
+// ---------- Popup modal ----------
+const modalOverlay = document.getElementById("modalOverlay");
+const modalTitle = document.getElementById("modalTitle");
+const modalText = document.getElementById("modalText");
+const modalInput = document.getElementById("modalInput");
+const modalConfirm = document.getElementById("modalConfirm");
+
+function showMessage(text, title) {
+  modalTitle.textContent = title || "Notice";
+  modalText.textContent = text;
+  modalInput.style.display = "none";
+  modalConfirm.style.display = "none";
+  modalOverlay.style.display = "flex";
+}
+function promptStore(onSubmit) {
+  modalTitle.textContent = "Add Store";
+  modalText.textContent = "Enter a new grocery store name:";
+  modalInput.style.display = "block";
+  modalInput.value = "";
+  modalConfirm.style.display = "inline-block";
+  modalConfirm.onclick = () => {
+    const v = modalInput.value.trim();
+    modalOverlay.style.display = "none";
+    if (v) onSubmit(v);
+  };
+  modalOverlay.style.display = "flex";
+  modalInput.focus();
+}
+document.getElementById("modalClose").addEventListener("click", () => modalOverlay.style.display = "none");
+modalOverlay.addEventListener("click", e => { if (e.target === modalOverlay) modalOverlay.style.display = "none"; });
+
+function confirmMessage(text, title, onConfirm, confirmLabel) {
+  modalTitle.textContent = title || "Confirm";
+  modalText.textContent = text;
+  modalInput.style.display = "none";
+  modalConfirm.style.display = "inline-block";
+  modalConfirm.textContent = confirmLabel || "OK";
+  modalConfirm.onclick = () => {
+    modalOverlay.style.display = "none";
+    if (onConfirm) onConfirm();
+  };
+  modalOverlay.style.display = "flex";
+}
+
+function deleteStore(name) {
+  if (customStores.includes(name)) {
+    customStores = customStores.filter(s => s !== name);
+    customProducts = customProducts.filter(p => p.store !== name);
+  } else {
+    if (!deletedStores.includes(name)) deletedStores.push(name);
+  }
+  storeOrder = storeOrder.filter(s => s !== name);
+  if (currentStore === name) currentStore = allStores()[0] || null;
+  saveLocal();
+  renderStores();
+  renderProducts();
+}
+
+let sortMode = "default";
+let searchTerm = "";
+let currentStore = null;
+
+// ---------- Local storage ----------
+// Rename old store names to the current display names
+const STORE_RENAME = {
+  "Jaks": "JaksMart",
+  "Maligaya": "Maligaya Mart",
+  "Frozen Goods - Kasiglahan": "Frozen Goods-Kasig",
+  "Frozen Goods - Kasig": "Frozen Goods-Kasig"
+};
+const renameStore = s => STORE_RENAME[s] || s;
+
+function loadLocal() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(LOCAL_KEY) || "{}");
+    customStores = [...new Set((saved.customStores || []).map(renameStore))];
+    customProducts = (saved.customProducts || []).map(p => ({ ...p, store: renameStore(p.store) }));
+    quantities = saved.quantities || {};
+    overrides = saved.overrides || {};
+    deletedIds = saved.deletedIds || [];
+    sortMode = saved.sortMode || "default";
+    const oldColors = saved.storeColors || {};
+    storeColors = { ...DEFAULT_STORE_COLORS };
+    Object.keys(oldColors).forEach(k => { storeColors[renameStore(k)] = oldColors[k]; });
+    deletedStores = [...new Set((saved.deletedStores || []).map(renameStore))]
+      // Old raw sheet names (Jaks, Maligaya, ...) were deleted as duplicates —
+      // their mapped versions (JaksMart, ...) are the canonical stores, so un-hide them
+      .filter(s => !DEFAULT_STORES.includes(s));
+    storeOrder = [...new Set((saved.storeOrder || []).map(renameStore))];
+    cartItems = Array.isArray(saved.cartItems) ? saved.cartItems : [];
+    collapsedStores = new Set(Array.isArray(saved.collapsedStores) ? saved.collapsedStores : []);
+  } catch (_) {}
+}
+function saveLocal() {
+  localStorage.setItem(LOCAL_KEY, JSON.stringify({ customStores, customProducts, quantities, overrides, deletedIds, sortMode, storeColors, deletedStores, storeOrder, cartItems, collapsedStores: [...collapsedStores] }));
+}
+
+// ---------- CSV parsing ----------
+function parseCSV(text) {
+  const rows = [];
+  let row = [], cell = "", inQuotes = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (inQuotes) {
+      if (c === '"') {
+        if (text[i + 1] === '"') { cell += '"'; i++; }
+        else inQuotes = false;
+      } else cell += c;
+    } else if (c === '"') inQuotes = true;
+    else if (c === ",") { row.push(cell); cell = ""; }
+    else if (c === "\n" || c === "\r") {
+      if (c === "\r" && text[i + 1] === "\n") i++;
+      row.push(cell); cell = "";
+      if (row.some(v => v.trim() !== "")) rows.push(row);
+      row = [];
+    } else cell += c;
+  }
+  if (cell !== "" || row.length) { row.push(cell); if (row.some(v => v.trim() !== "")) rows.push(row); }
+  return rows;
+}
+
+// ---------- Data ----------
+async function loadSheet() {
+  const note = document.getElementById("statusNote");
+  if (ONLINE) {
+    try {
+      const res = await fetch(APPS_SCRIPT_URL + "?t=" + Date.now(), { cache: "no-store" });
+      if (!res.ok) throw new Error("bad status");
+      const data = await res.json();
+      const items = Array.isArray(data.products) ? data.products : [];
+      sheetRows = items
+        .map(r => {
+          const rawStore = String(r.STORE ?? "").trim();
+          return {
+            id: "row-" + r.row,
+            row: r.row,
+            product: String(r.PRODUCT ?? "").trim(),
+            variation: String(r.VARIATION ?? "").trim(),
+            details: String(r.DETAILS ?? "").trim(),
+            price: parseFloat(String(r.PRICE ?? "0").replace(/[₱,]/g, "")) || 0,
+            store: STORE_DISPLAY[rawStore] || rawStore
+          };
+        })
+        .filter(r => r.product && r.store);
+      note.textContent = `Live database — ${sheetRows.length} products synced from Google Sheets.`;
+    } catch (e) {
+      note.textContent = `Could not reach the live database — using the built-in default list (${sheetRows.length} products).`;
+    }
+    renderStores();
+    renderProducts();
+    return;
+  }
+  try {
+    const res = await fetch(SHEET_CSV_URL + "&_=" + Date.now(), { cache: "no-store" });
+    if (!res.ok) throw new Error("bad status");
+    const rows = parseCSV(await res.text());
+    if (!rows.length) throw new Error("empty");
+    const header = rows[0].map(h => h.trim().toUpperCase());
+    const idx = name => header.indexOf(name);
+    const iProduct = idx("PRODUCT"), iVar = idx("VARIATION"), iDet = idx("DETAILS"),
+          iPrice = idx("PRICE"), iStore = idx("STORE");
+    sheetRows = rows.slice(1)
+      .map((r, i) => ({
+        id: "sheet-" + i,
+        product: (r[iProduct] || "").trim(),
+        variation: (r[iVar] || "").trim(),
+        details: (r[iDet] || "").trim(),
+        price: parseFloat((r[iPrice] || "0").replace(/[₱,]/g, "")) || 0,
+        store: (r[iStore] || "").trim()
+      }))
+      .filter(r => r.product && r.store);
+    note.textContent = `Synced from Google Sheet — ${sheetRows.length} products loaded.`;
+  } catch (e) {
+    note.textContent = `Offline — using the built-in default list (${sheetRows.length} products).`;
+  }
+  renderStores();
+  renderProducts();
+}
+
+// Send a change to the shared online database, then refresh the list
+async function pushChange(payload) {
+  if (!ONLINE) return false;
+  try {
+    await fetch(APPS_SCRIPT_URL, {
+      method: "POST",
+      mode: "no-cors",
+      headers: { "Content-Type": "text/plain" },
+      body: JSON.stringify(payload)
+    });
+  } catch (_) {}
+  await loadSheet();
+  return true;
+}
+
+function allStores() {
+  const fromSheet = [...new Set(sheetRows.map(r => r.store))];
+  let merged = [...new Set([...fromSheet, ...customStores])];
+  if (!merged.length) merged = [...DEFAULT_STORES];
+  merged = merged.filter(s => !deletedStores.includes(s));
+  const order = storeOrder.length ? storeOrder : DEFAULT_STORES;
+  const ordered = order.filter(s => merged.includes(s));
+  const rest = merged.filter(s => !order.includes(s));
+  return [...ordered, ...rest];
+}
+
+function productsFor(store) {
+  if (ONLINE) {
+    return sheetRows.filter(r => r.store === store);
+  }
+  return [...sheetRows.filter(r => r.store === store), ...customProducts.filter(r => r.store === store)]
+    .filter(r => !deletedIds.includes(r.id))
+    .map(r => (overrides[r.id] ? { ...r, ...overrides[r.id] } : r));
+}
+
+function sortRows(rows) {
+  const copy = [...rows];
+  switch (sortMode) {
+    case "name-asc": return copy.sort((a, b) => a.product.localeCompare(b.product));
+    case "name-desc": return copy.sort((a, b) => b.product.localeCompare(a.product));
+    case "price-asc": return copy.sort((a, b) => a.price - b.price);
+    case "price-desc": return copy.sort((a, b) => b.price - a.price);
+    default: return copy;
+  }
+}
+
+// ---------- Rendering ----------
+function renderStores() {
+  const wrap = document.getElementById("storeButtons");
+  wrap.innerHTML = "";
+  const stores = allStores();
+  if (!currentStore && stores.length) currentStore = stores[0];
+  stores.forEach(s => {
+    const b = document.createElement("button");
+    b.className = "store-btn" + (s === currentStore ? " active" : "");
+    b.textContent = s;
+    b.draggable = true;
+    if (storeColors[s]) b.style.background = storeColors[s];
+    if (s === currentStore) b.style.color = "#fff";
+
+    const pop = document.createElement("div");
+    pop.className = "color-pop";
+    const label = document.createElement("span");
+    label.textContent = "Color";
+    const picker = document.createElement("input");
+    picker.type = "color";
+    picker.value = storeColors[s] || "#eef2f7";
+    picker.addEventListener("input", () => {
+      storeColors[s] = picker.value;
+      saveLocal();
+      b.style.background = picker.value;
+    });
+    pop.append(label, picker);
+    b.appendChild(pop);
+
+    let hideTimer;
+    b.addEventListener("mouseenter", () => {
+      clearTimeout(hideTimer);
+      document.querySelectorAll(".color-pop.open").forEach(p => { if (p !== pop) p.classList.remove("open"); });
+      pop.classList.add("open");
+    });
+    b.addEventListener("mouseleave", () => {
+      hideTimer = setTimeout(() => pop.classList.remove("open"), 250);
+    });
+    pop.addEventListener("mouseenter", () => clearTimeout(hideTimer));
+    pop.addEventListener("mouseleave", () => pop.classList.remove("open"));
+
+    b.addEventListener("dragstart", e => {
+      draggedStore = s;
+      e.dataTransfer.effectAllowed = "move";
+      b.classList.add("dragging");
+    });
+    b.addEventListener("dragend", () => b.classList.remove("dragging"));
+    b.addEventListener("dragover", e => {
+      e.preventDefault();
+      b.classList.add("drag-over");
+    });
+    b.addEventListener("dragleave", () => b.classList.remove("drag-over"));
+    b.addEventListener("drop", e => {
+      e.preventDefault();
+      b.classList.remove("drag-over");
+      if (draggedStore === null || draggedStore === s) return;
+      const base = allStores();
+      const from = base.indexOf(draggedStore);
+      const to = base.indexOf(s);
+      if (from < 0 || to < 0) return;
+      base.splice(from, 1);
+      base.splice(to, 0, draggedStore);
+      storeOrder = base;
+      saveLocal();
+      renderStores();
+    });
+
+    b.addEventListener("click", () => { currentStore = s; renderStores(); renderProducts(); });
+    wrap.appendChild(b);
+  });
+}
+
+function renderProducts() {
+  const tbody = document.getElementById("productRows");
+  document.getElementById("storeTitle").textContent = currentStore ? `Products — ${currentStore}` : "Products";
+  tbody.innerHTML = "";
+  if (!currentStore) {
+    tbody.innerHTML = '<tr><td colspan="7" class="empty">Select a store.</td></tr>';
+    updateTotal();
+    return;
+  }
+  const rows = sortRows(productsFor(currentStore)).filter(r => {
+    const t = searchTerm.trim().toLowerCase();
+    if (!t) return true;
+    return r.product.toLowerCase().includes(t)
+        || r.variation.toLowerCase().includes(t)
+        || r.details.toLowerCase().includes(t);
+  });
+  if (!rows.length) {
+    tbody.innerHTML = '<tr><td colspan="7" class="empty">No products found.</td></tr>';
+  }
+  rows.forEach((r) => {
+    const tr = document.createElement("tr");
+    const qty = quantities[r.id] ?? "";
+    tr.innerHTML = `
+      <td class="cell-label">${escapeHtml(r.product)}</td>
+      <td class="cell-label">${escapeHtml(r.variation)}</td>
+      <td class="cell-label">${escapeHtml(r.details)}</td>
+      <td class="price cell-label">₱${r.price.toFixed(2)}</td>
+      <td class="qty"></td>
+      <td class="price row-total">₱${((Number(qty) || 0) * r.price).toFixed(2)}</td>
+      <td>
+        <button class="add-cart-btn" data-cart-id="${r.id}" title="Add to Cart" disabled><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg></button>
+      </td>`;
+    tbody.appendChild(tr);
+
+    // build the +/- stepper for the quantity cell
+    const qtyCell = tr.querySelector("td.qty");
+    const qtyInput = document.createElement("input");
+    qtyInput.type = "number";
+    qtyInput.min = "0";
+    qtyInput.step = "1";
+    qtyInput.className = "qty-input";
+    qtyInput.value = qty;
+    qtyInput.dataset.id = r.id;
+    qtyInput.dataset.row = r.row || "";
+    qtyInput.dataset.price = r.price;
+    const stepper = document.createElement("div");
+    stepper.className = "stepper";
+    const minus = document.createElement("button");
+    minus.type = "button";
+    minus.className = "step-btn";
+    minus.textContent = "−";
+    const plus = document.createElement("button");
+    plus.type = "button";
+    plus.className = "step-btn";
+    plus.textContent = "+";
+    const bump = d => {
+      const v = Math.max(0, (Number(qtyInput.value) || 0) + d);
+      qtyInput.value = v === 0 ? "" : v; // show blank instead of "0"
+      qtyInput.dispatchEvent(new Event("input", { bubbles: true }));
+    };
+    minus.addEventListener("click", () => bump(-1));
+    plus.addEventListener("click", () => bump(1));
+    stepper.append(minus, qtyInput, plus);
+    qtyCell.appendChild(stepper);
+  });
+  tbody.querySelectorAll("input.qty-input").forEach(inp => {
+    inp.addEventListener("input", () => {
+      if (inp.value === "0" || inp.value === "0.00") inp.value = ""; // blank instead of "0"
+      quantities[inp.dataset.id] = inp.value;
+      saveLocal();
+      const tr = inp.closest("tr");
+      const rowTotal = tr.querySelector(".row-total");
+      if (rowTotal) rowTotal.textContent = "₱" + ((Number(inp.value) || 0) * (Number(inp.dataset.price) || 0)).toFixed(2);
+      const cartBtn = tr.querySelector(".add-cart-btn");
+      if (cartBtn) cartBtn.disabled = !(Number(inp.value) > 0);
+      updateTotal();
+    });
+  });
+  updateTotal();
+}
+
+function updateTotal() {
+  let total = 0;
+  document.querySelectorAll("#productRows input.qty-input").forEach(inp => {
+    const q = Number(inp.value) || 0;
+    total += q * (Number(inp.dataset.price) || 0);
+  });
+  document.getElementById("totalDisplay").textContent =
+    "₱" + total.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+
+document.getElementById("searchInput").addEventListener("input", e => {
+  searchTerm = e.target.value;
+  renderProducts();
+});
+
+// ---------- Cart ----------
+function updateCartCount() {
+  const el = document.getElementById("cartCount");
+  if (el) el.textContent = cartItems.length;
+}
+
+function addToCart(r) {
+  const qty = Math.max(1, Math.floor(Number(r.qty) || 1));
+  // if the same product is already in the cart, just increase its quantity
+  const existing = cartItems.find(x =>
+    x.store === r.store && x.product === r.product &&
+    x.variation === r.variation && x.details === r.details
+  );
+  if (existing) {
+    existing.qty += qty;
+  } else {
+    cartItems.push({
+      id: "cart-" + Date.now() + "-" + Math.floor(Math.random() * 1000),
+      product: r.product,
+      variation: r.variation,
+      details: r.details,
+      price: r.price,
+      store: r.store,
+      qty,
+      srcId: r.id
+    });
+  }
+  saveLocal();
+  renderCart();
+  updateCartCount();
+  // clear the quantity input on the product row
+  const srcInput = document.querySelector(`input.qty-input[data-id="${r.id}"]`);
+  if (srcInput) {
+    srcInput.value = "";
+    quantities[r.id] = "";
+    const tr = srcInput.closest("tr");
+    const rt = tr.querySelector(".row-total");
+    if (rt) rt.textContent = "₱0.00";
+    const cb = tr.querySelector(".add-cart-btn");
+    if (cb) cb.disabled = true;
+    saveLocal();
+  }
+  renderProducts();
+}
+
+function sortCartItems(items) {
+  const copy = [...items];
+  const mode = (document.getElementById("cartSort") || {}).value || "default";
+  if (mode === "name-asc") return copy.sort((a, b) => a.product.localeCompare(b.product));
+  if (mode === "store-asc") return copy.sort((a, b) => a.store.localeCompare(b.store) || a.product.localeCompare(b.product));
+  return copy;
+}
+
+function renderCartSummary() {
+  const summary = document.getElementById("cartSummary");
+  if (!summary) return;
+  if (cartItems.length === 0) { summary.innerHTML = ""; return; }
+  const groups = [];
+  const groupIndex = {};
+  cartItems.forEach(it => {
+    if (!(it.store in groupIndex)) {
+      groupIndex[it.store] = groups.length;
+      groups.push({ store: it.store, items: [] });
+    }
+    groups[groupIndex[it.store]].items.push(it);
+  });
+  let html = "";
+  groups.forEach(g => {
+    const subtotal = g.items.reduce((s, it) => s + (Number(it.price) || 0) * (Number(it.qty) || 1), 0);
+    html += `<div class="row"><span>${escapeHtml(g.store)}</span><span>₱${subtotal.toFixed(2)}</span></div>`;
+  });
+  const grand = cartItems.reduce((s, it) => s + (Number(it.price) || 0) * (Number(it.qty) || 1), 0);
+  html += `<div class="row total"><span>Overall Total</span><span>₱${grand.toFixed(2)}</span></div>`;
+  summary.innerHTML = html;
+}
+
+function renderCart() {
+  const wrap = document.getElementById("cartItems");
+  const summary = document.getElementById("cartSummary");
+  if (!wrap || !summary) return;
+  wrap.innerHTML = "";
+
+  if (cartItems.length === 0) {
+    wrap.innerHTML = '<div class="empty">Your cart is empty.<br>Add products with the 🛒 button.</div>';
+    summary.innerHTML = "";
+    return;
+  }
+
+  const items = sortCartItems(cartItems);
+
+  // group by store, preserving first-seen order
+  const groups = [];
+  const groupIndex = {};
+  items.forEach(it => {
+    if (!(it.store in groupIndex)) {
+      groupIndex[it.store] = groups.length;
+      groups.push({ store: it.store, items: [] });
+    }
+    groups[groupIndex[it.store]].items.push(it);
+  });
+
+  groups.forEach(g => {
+    const subtotal = g.items.reduce((s, it) => s + (Number(it.price) || 0) * (Number(it.qty) || 1), 0);
+    const collapsed = collapsedStores.has(g.store);
+    const label = document.createElement("div");
+    label.className = "cart-group-label";
+    label.draggable = true;
+    label.innerHTML = `<span><span class="cart-toggle">${collapsed ? "▶" : "▼"}</span>${escapeHtml(g.store)}</span><span class="ci-subtotal">₱${subtotal.toFixed(2)}</span>`;
+    // collapse / expand this store group
+    label.addEventListener("click", () => {
+      if (collapsedStores.has(g.store)) collapsedStores.delete(g.store);
+      else collapsedStores.add(g.store);
+      saveLocal();
+      renderCart();
+    });
+    // drag the whole store group to reorder stores
+    label.addEventListener("dragstart", e => {
+      draggedGroup = g.store;
+      label.classList.add("dragging");
+      e.dataTransfer.effectAllowed = "move";
+    });
+    label.addEventListener("dragend", () => label.classList.remove("dragging"));
+    label.addEventListener("dragover", e => {
+      e.preventDefault();
+      label.classList.add("drag-over");
+    });
+    label.addEventListener("dragleave", () => label.classList.remove("drag-over"));
+    label.addEventListener("drop", e => {
+      e.preventDefault();
+      label.classList.remove("drag-over");
+      if (!draggedGroup || draggedGroup === g.store) return;
+      const moving = cartItems.filter(x => x.store === draggedGroup);
+      const rest = cartItems.filter(x => x.store !== draggedGroup);
+      const insertAt = rest.findIndex(x => x.store === g.store);
+      if (insertAt < 0) return;
+      rest.splice(insertAt, 0, ...moving);
+      cartItems = rest;
+      saveLocal();
+      renderCart();
+    });
+    wrap.appendChild(label);
+
+    if (collapsed) return; // hide items of collapsed groups
+
+    g.items.forEach(it => {
+      const row = document.createElement("div");
+      row.className = "cart-item";
+      row.draggable = true;
+      row.dataset.cartId = it.id;
+      row.innerHTML = `
+        <span class="drag-handle" title="Drag to reorder">⠿</span>
+        <div>
+          <div class="ci-name">${escapeHtml(it.product)}</div>
+          <div class="ci-meta">${escapeHtml(it.variation)}${it.details ? " · " + escapeHtml(it.details) : ""}</div>
+        </div>
+        <span class="ci-stepper">
+          <button type="button" class="step-btn ci-minus">−</button>
+          <input type="number" min="1" step="1" class="ci-qty" value="${it.qty}" title="Quantity">
+          <button type="button" class="step-btn ci-plus">+</button>
+        </span>
+        <span class="ci-price">₱${((Number(it.price) || 0) * (Number(it.qty) || 1)).toFixed(2)}</span>
+        <button class="ci-del" title="Remove from cart"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>`;
+      row.addEventListener("dragstart", e => {
+        draggedCartId = it.id;
+        row.classList.add("dragging");
+        e.dataTransfer.effectAllowed = "move";
+      });
+      row.addEventListener("dragend", () => row.classList.remove("dragging"));
+      row.addEventListener("dragover", e => {
+        e.preventDefault();
+        row.classList.add("drag-over");
+      });
+      row.addEventListener("dragleave", () => row.classList.remove("drag-over"));
+      row.addEventListener("drop", e => {
+        e.preventDefault();
+        row.classList.remove("drag-over");
+        if (draggedCartId === null || draggedCartId === it.id) return;
+        const from = cartItems.findIndex(x => x.id === draggedCartId);
+        const to = cartItems.findIndex(x => x.id === it.id);
+        if (from < 0 || to < 0) return;
+        const [moved] = cartItems.splice(from, 1);
+        cartItems.splice(to, 0, moved);
+        saveLocal();
+        renderCart();
+      });
+      const bumpCi = d => {
+        const ciQty = row.querySelector(".ci-qty");
+        ciQty.value = Math.max(1, (Number(ciQty.value) || 1) + d);
+        ciQty.dispatchEvent(new Event("input", { bubbles: true }));
+      };
+      row.querySelector(".ci-minus").addEventListener("click", () => bumpCi(-1));
+      row.querySelector(".ci-plus").addEventListener("click", () => bumpCi(1));
+      row.querySelector(".ci-qty").addEventListener("input", e => {
+        const q = Math.max(1, Math.floor(Number(e.target.value) || 1));
+        it.qty = q;
+        e.target.value = q;
+        saveLocal();
+        row.querySelector(".ci-price").textContent = "₱" + ((Number(it.price) || 0) * q).toFixed(2);
+        // update the per-store subtotal beside the store name
+        let label = row.previousElementSibling;
+        while (label && !label.classList.contains("cart-group-label")) label = label.previousElementSibling;
+        if (label) {
+          const groupItems = cartItems.filter(x => x.store === it.store);
+          const sub = groupItems.reduce((s, x) => s + (Number(x.price) || 0) * (Number(x.qty) || 1), 0);
+          const subEl = label.querySelector(".ci-subtotal");
+          if (subEl) subEl.textContent = "₱" + sub.toFixed(2);
+        }
+        renderCartSummary();
+      });
+      row.querySelector(".ci-del").addEventListener("click", () => {
+        cartItems = cartItems.filter(x => x.id !== it.id);
+        saveLocal();
+        renderCart();
+        updateCartCount();
+        renderProducts();
+      });
+      wrap.appendChild(row);
+    });
+  });
+
+  renderCartSummary();
+}
+
+document.getElementById("cartToggleBtn").addEventListener("click", () => {
+  document.getElementById("cartSidebar").classList.toggle("open");
+  renderCart();
+});
+document.getElementById("cartCloseBtn").addEventListener("click", () => {
+  document.getElementById("cartSidebar").classList.remove("open");
+});
+document.getElementById("cartSort").addEventListener("change", renderCart);
+
+// Add-to-cart buttons (delegated, since rows re-render)
+document.getElementById("productRows").addEventListener("click", e => {
+  const btn = e.target.closest(".add-cart-btn");
+  if (!btn) return;
+  const id = btn.dataset.cartId;
+  const qtyInput = btn.closest("tr").querySelector("input.qty-input");
+  const r = sheetRows.find(x => x.id === id);
+  if (r) {
+    r.qty = qtyInput ? qtyInput.value : "";
+    addToCart(r);
+  }
+});
+
+loadLocal();
+document.getElementById("sortSelect").value = sortMode;
+document.getElementById("sortSelect").addEventListener("change", e => {
+  sortMode = e.target.value;
+  saveLocal();
+  renderProducts();
+});
+
+loadSheet();
+updateCartCount();
+</script>
+</body>
+</html>
