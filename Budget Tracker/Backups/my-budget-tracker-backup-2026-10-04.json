@@ -1,0 +1,56 @@
+{
+  "app": "My Budget Tracker",
+  "version": 2,
+  "exportedAt": "2026-10-04T10:20:13.244Z",
+  "salary": 10000,
+  "expenses": [
+    {
+      "id": "1787dca8-1ee8-4ea1-bd97-5cba84353785",
+      "name": "Church",
+      "amount": 1000,
+      "checked": true
+    },
+    {
+      "id": "88ae8fb6-ffe5-4ade-ba4b-25ce87735ff5",
+      "name": "Transportation",
+      "amount": 2000,
+      "checked": true
+    },
+    {
+      "id": "7bafa977-f31c-422a-80f9-949e17e9a6ca",
+      "name": "Insurance",
+      "amount": 1050,
+      "checked": true
+    },
+    {
+      "id": "397fb7e9-6bbf-4570-bd77-e20ceb4462f1",
+      "name": "Bills",
+      "amount": 1750,
+      "checked": true
+    },
+    {
+      "id": "b9428018-6450-4871-879a-842a3432f297",
+      "name": "Grocery",
+      "amount": 1500,
+      "checked": true
+    },
+    {
+      "id": "5e571a8b-b6ab-4540-bd58-7dd19506af81",
+      "name": "Rice & LPG",
+      "amount": 500,
+      "checked": true
+    },
+    {
+      "id": "06b2bcd9-ee6f-4dc8-b2fb-e18449059217",
+      "name": "Savings",
+      "amount": 500,
+      "checked": true
+    },
+    {
+      "id": "74fb6c8b-2078-4d1a-a80b-0d9d09c53731",
+      "name": "Emergency Funds",
+      "amount": 500,
+      "checked": true
+    }
+  ]
+}
