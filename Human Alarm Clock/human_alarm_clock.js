@@ -2,8 +2,7 @@
 "use strict";
 const ALARM_KEY = "humanAlarm_schedule";
 const REST_DAYS_KEY = "humanAlarm_restDays";
-let restDays = [];
-let restDaysStartDate = null;
+let restDayScheduleHistory = [];
 const ALARM_TIERS = {
   tier1: { name: "Tier 1", price: "P50.00" },
   tier2: { name: "Tier 2", price: "P70.00" },
@@ -19,19 +18,48 @@ function loadAlarmSchedule() {
     alarmSchedule = parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {};
   } catch (_) { alarmSchedule = {}; }
 }
+function normalizeRestDays(days) {
+  return Array.isArray(days)
+    ? Array.from(new Set(days.map(Number).filter(day => Number.isInteger(day) && day >= 0 && day <= 6))).slice(0, 2).sort((a, b) => a - b)
+    : [];
+}
 function loadRestDays() {
   try {
     const parsed = JSON.parse(localStorage.getItem(REST_DAYS_KEY) || "[]");
-    // Support the earlier array format so existing saved schedules keep working.
-    const days = Array.isArray(parsed) ? parsed : (parsed && Array.isArray(parsed.days) ? parsed.days : []);
-    restDays = days.map(Number).filter(day => Number.isInteger(day) && day >= 0 && day <= 6).slice(0, 2);
-    restDaysStartDate = !Array.isArray(parsed) && parsed && /^\d{4}-\d{2}-\d{2}$/.test(parsed.startDate || "")
-      ? parsed.startDate : null;
-  } catch (_) { restDays = []; restDaysStartDate = null; }
+    if (Array.isArray(parsed)) {
+      // Older versions stored only the two weekdays; preserve that pattern for all earlier dates.
+      const legacyDays = normalizeRestDays(parsed);
+      restDayScheduleHistory = legacyDays.length ? [{ startDate: "0001-01-01", days: legacyDays }] : [];
+    } else if (parsed && Array.isArray(parsed.history)) {
+      restDayScheduleHistory = parsed.history
+        .filter(item => item && /^\d{4}-\d{2}-\d{2}$/.test(item.startDate || ""))
+        .map(item => ({ startDate: item.startDate, days: normalizeRestDays(item.days) }))
+        .filter(item => item.days.length === 2)
+        .sort((a, b) => a.startDate.localeCompare(b.startDate));
+    } else if (parsed && Array.isArray(parsed.days)) {
+      const legacyDays = normalizeRestDays(parsed.days);
+      const startDate = /^\d{4}-\d{2}-\d{2}$/.test(parsed.startDate || "") ? parsed.startDate : "0001-01-01";
+      restDayScheduleHistory = legacyDays.length ? [{ startDate, days: legacyDays }] : [];
+    } else {
+      restDayScheduleHistory = [];
+    }
+  } catch (_) { restDayScheduleHistory = []; }
 }
 function saveRestDays() {
-  try { localStorage.setItem(REST_DAYS_KEY, JSON.stringify({ days: restDays, startDate: restDaysStartDate })); }
+  try { localStorage.setItem(REST_DAYS_KEY, JSON.stringify({ history: restDayScheduleHistory })); }
   catch (error) { console.error("Could not save work schedule:", error); }
+}
+function getRestDaysForDate(dateStr) {
+  let active = [];
+  for (const item of restDayScheduleHistory) {
+    if (item.startDate > dateStr) break;
+    active = item.days;
+  }
+  return active;
+}
+function isRestDayDate(dateStr) {
+  const weekday = new Date(dateStr + "T12:00:00").getDay();
+  return getRestDaysForDate(dateStr).includes(weekday);
 }
 function getSundayOfWeek(date) {
   const sunday = new Date(date.getFullYear(), date.getMonth(), date.getDate() - date.getDay());
@@ -53,14 +81,22 @@ function updateRestDayHint() {
 }
 function openWorkScheduleModal() {
   const weekInput = document.getElementById("workScheduleStartWeek");
-  weekInput.value = getSundayOfWeek(restDaysStartDate
-    ? new Date(restDaysStartDate + "T12:00:00") : new Date());
+  const initialWeek = getSundayOfWeek(new Date());
+  weekInput.value = initialWeek;
+  updateRestDayChoicesForWeek();
   document.querySelectorAll(".rest-day-choice").forEach(function(choice) {
-    choice.checked = restDays.includes(Number(choice.value));
     choice.disabled = false;
   });
   updateRestDayHint();
   document.getElementById("workScheduleModal").classList.add("open");
+}
+function updateRestDayChoicesForWeek() {
+  const sunday = getSundayFromDateValue(document.getElementById("workScheduleStartWeek").value);
+  const activeDays = sunday ? getRestDaysForDate(sunday) : [];
+  document.querySelectorAll(".rest-day-choice").forEach(function(choice) {
+    choice.checked = activeDays.includes(Number(choice.value));
+  });
+  updateRestDayHint();
 }
 function closeWorkScheduleModal() {
   document.getElementById("workScheduleModal").classList.remove("open");
@@ -75,9 +111,11 @@ function saveWorkScheduleSelection() {
     return;
   }
   const today = alarmToDateStr(new Date());
-  restDays = selected.sort((a, b) => a - b);
-  // Weeks start on Sunday; never apply a new schedule retroactively.
-  restDaysStartDate = sunday < today ? today : sunday;
+  const effectiveStart = sunday < today ? today : sunday;
+  // Keep all earlier schedule periods; replace only this date and later periods.
+  restDayScheduleHistory = restDayScheduleHistory.filter(item => item.startDate < effectiveStart);
+  restDayScheduleHistory.push({ startDate: effectiveStart, days: selected.sort((a, b) => a - b) });
+  restDayScheduleHistory.sort((a, b) => a.startDate.localeCompare(b.startDate));
   saveRestDays();
   closeWorkScheduleModal();
   alarmRenderCalendar();
@@ -180,9 +218,17 @@ function alarmRenderCalendar() {
       cell.setAttribute("role", "button");
       cell.setAttribute("tabindex", "0");
       cell.setAttribute("aria-label", alarmFormatDateNice(dateStr) + (tier ? ", " + tier.name + (entry.paid ? ", paid" : ", unpaid") : hasNote ? ", " + entry.note : ", add label"));
-      const isRestDay = (!restDaysStartDate || dateStr >= restDaysStartDate) &&
-        restDays.includes(new Date(dateStr + "T12:00:00").getDay());
-      if (isRestDay) cell.classList.add("alarm-rest");
+      const isRestDay = isRestDayDate(dateStr);
+      if (isRestDay) {
+        cell.classList.add("alarm-rest", "alarm-locked");
+        cell.setAttribute("aria-disabled", "true");
+        cell.setAttribute("aria-label", alarmFormatDateNice(dateStr) + ", Rest Day, unavailable for labels or notes");
+        cell.setAttribute("tabindex", "-1");
+        cell.removeAttribute("role");
+      } else {
+        cell.setAttribute("role", "button");
+        cell.setAttribute("tabindex", "0");
+      }
       else if (tier) cell.classList.add(entry.paid ? "alarm-green" : "alarm-red");
       else if (hasNote) cell.classList.add("alarm-note");
       if (dateStr === today) cell.classList.add("alarm-today");
@@ -222,7 +268,7 @@ function alarmRenderCalendar() {
         cell.appendChild(restLabel);
       }
 
-      if (tier || hasNote) {
+      if ((tier || hasNote) && !isRestDay) {
         const actions = document.createElement("div");
         actions.className = "cell-actions";
         actions.appendChild(makeIconButton("Remove Label", "remove", dateStr));
@@ -252,6 +298,7 @@ function updateAlarmServicePrice() {
   }
 }
 function openAlarmModal(dateStr) {
+  if (isRestDayDate(dateStr)) return;
   selectedAlarmDate = dateStr;
   const entry = getAlarmEntry(dateStr);
   const select = document.getElementById("serviceLevel");
@@ -283,6 +330,7 @@ function initAlarmCalendar() {
     document.getElementById("closeWorkSchedule").addEventListener("click", closeWorkScheduleModal);
     document.getElementById("cancelWorkSchedule").addEventListener("click", closeWorkScheduleModal);
     document.getElementById("saveWorkSchedule").addEventListener("click", saveWorkScheduleSelection);
+    document.getElementById("workScheduleStartWeek").addEventListener("change", updateRestDayChoicesForWeek);
     document.getElementById("workScheduleModal").addEventListener("click", function(event) {
       if (event.target === this) closeWorkScheduleModal();
     });
@@ -305,7 +353,7 @@ function initAlarmCalendar() {
       const actionButton = event.target.closest("button[data-action]");
       if (actionButton) {
         const dateStr = actionButton.dataset.date;
-        if (actionButton.dataset.action === "remove") {
+        if (actionButton.dataset.action === "remove" && !isRestDayDate(dateStr)) {
           delete alarmSchedule[dateStr];
           saveAlarmSchedule();
           alarmRenderCalendar();
@@ -314,12 +362,13 @@ function initAlarmCalendar() {
       }
       if (event.target.closest("input[data-paid-date]")) return;
       const cell = event.target.closest(".alarm-cell[data-date]");
-      if (cell) openAlarmModal(cell.dataset.date);
+      if (cell && !isRestDayDate(cell.dataset.date)) openAlarmModal(cell.dataset.date);
     });
     document.getElementById("alarmCalendar").addEventListener("change", function(event) {
       const checkbox = event.target.closest("input[data-paid-date]");
       if (!checkbox) return;
       const dateStr = checkbox.dataset.paidDate;
+      if (isRestDayDate(dateStr)) { alarmRenderCalendar(); return; }
       const entry = getAlarmEntry(dateStr);
       if (!Object.prototype.hasOwnProperty.call(ALARM_TIERS, entry.serviceLevel)) return;
       alarmSchedule[dateStr] = { serviceLevel: entry.serviceLevel, note: entry.note, paid: checkbox.checked };
@@ -327,7 +376,7 @@ function initAlarmCalendar() {
       alarmRenderCalendar();
     });
     document.getElementById("alarmCalendar").addEventListener("keydown", function(event) {
-      if ((event.key === "Enter" || event.key === " ") && event.target.matches(".alarm-cell[data-date]")) {
+      if ((event.key === "Enter" || event.key === " ") && event.target.matches(".alarm-cell[data-date]") && !isRestDayDate(event.target.dataset.date)) {
         event.preventDefault();
         openAlarmModal(event.target.dataset.date);
       }
@@ -336,7 +385,7 @@ function initAlarmCalendar() {
     document.getElementById("saveLabel").addEventListener("click", function() {
       const level = document.getElementById("serviceLevel").value;
       const notes = document.getElementById("labelNotes").value.trim();
-      if (!selectedAlarmDate) return;
+      if (!selectedAlarmDate || isRestDayDate(selectedAlarmDate)) return;
       if (Object.prototype.hasOwnProperty.call(ALARM_TIERS, level)) {
         const previous = getAlarmEntry(selectedAlarmDate);
         alarmSchedule[selectedAlarmDate] = { serviceLevel: level, note: "", paid: previous.serviceLevel === level ? previous.paid : false };
