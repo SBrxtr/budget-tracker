@@ -25,7 +25,7 @@ function loadRestDays() {
     // Support the earlier array format so existing saved schedules keep working.
     const days = Array.isArray(parsed) ? parsed : (parsed && Array.isArray(parsed.days) ? parsed.days : []);
     restDays = days.map(Number).filter(day => Number.isInteger(day) && day >= 0 && day <= 6).slice(0, 2);
-    restDaysStartDate = !Array.isArray(parsed) && parsed && /^\\d{4}-\\d{2}-\\d{2}$/.test(parsed.startDate || "")
+    restDaysStartDate = !Array.isArray(parsed) && parsed && /^\d{4}-\d{2}-\d{2}$/.test(parsed.startDate || "")
       ? parsed.startDate : null;
   } catch (_) { restDays = []; restDaysStartDate = null; }
 }
@@ -41,7 +41,7 @@ function getISOWeekValue(date) {
   return value.getUTCFullYear() + "-W" + String(week).padStart(2, "0");
 }
 function getMondayOfISOWeek(weekValue) {
-  const match = /^(\\d{4})-W(\\d{2})$/.exec(weekValue || "");
+  const match = /^(\d{4})-W(\d{2})$/.exec(weekValue || "");
   if (!match) return null;
   const year = Number(match[1]);
   const week = Number(match[2]);
