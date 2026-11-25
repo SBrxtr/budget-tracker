@@ -61,6 +61,34 @@ function makeIconButton(title, action, dateStr) {
   button.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true">' + paths[action] + '</svg>';
   return button;
 }
+function alarmRenderUnpaidSummary() {
+  const countElement = document.getElementById("unpaidDaysCount");
+  const listElement = document.getElementById("unpaidDaysList");
+  const totalElement = document.getElementById("unpaidTotalAmount");
+  if (!countElement || !listElement || !totalElement) return;
+
+  const unpaid = Object.keys(alarmSchedule).map(function(dateStr) {
+    const entry = getAlarmEntry(dateStr);
+    const tier = ALARM_TIERS[entry.serviceLevel];
+    if (!tier || entry.paid) return null;
+    const parts = dateStr.split("-").map(Number);
+    const date = new Date(parts[0], parts[1] - 1, parts[2]);
+    return {
+      dateStr: dateStr,
+      date: date,
+      amount: Number(tier.price.replace(/[^0-9.]/g, "")) || 0
+    };
+  }).filter(Boolean).sort(function(a, b) { return a.date - b.date; });
+
+  const total = unpaid.reduce(function(sum, item) { return sum + item.amount; }, 0);
+  countElement.textContent = String(unpaid.length);
+  listElement.textContent = unpaid.length
+    ? unpaid.map(function(item) {
+        return item.date.toLocaleDateString("en-PH", { weekday: "short", month: "short", day: "numeric", year: "numeric" });
+      }).join(" • ")
+    : "No unpaid days.";
+  totalElement.textContent = "P" + total.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
 function alarmRenderCalendar() {
   const container = document.getElementById("alarmCalendar");
   if (!container) throw new Error("Calendar container #alarmCalendar was not found.");
@@ -127,6 +155,7 @@ function alarmRenderCalendar() {
     }
     grid.appendChild(cell);
   });
+  alarmRenderUnpaidSummary();
 }
 function updateAlarmServicePrice() {
   const level = document.getElementById("serviceLevel").value;
