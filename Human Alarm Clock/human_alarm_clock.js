@@ -228,9 +228,9 @@ function alarmRenderCalendar() {
       } else {
         cell.setAttribute("role", "button");
         cell.setAttribute("tabindex", "0");
+        if (tier) cell.classList.add(entry.paid ? "alarm-green" : "alarm-red");
+        else if (hasNote) cell.classList.add("alarm-note");
       }
-      else if (tier) cell.classList.add(entry.paid ? "alarm-green" : "alarm-red");
-      else if (hasNote) cell.classList.add("alarm-note");
       if (dateStr === today) cell.classList.add("alarm-today");
 
       const dayNumber = document.createElement("span");
