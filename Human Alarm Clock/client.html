@@ -175,5 +175,7 @@ document.getElementById("workApplyBtn").addEventListener("click", function () { 
 loadAlarmSchedule();
 alarmRenderCalendar("alarmCalendarClient", { readOnly: false, onSelect: clientOpenLabelPanel });
 </script>
+
+<script type="module">import { requireRole } from "./auth-guard.js"; requireRole("client");</script>
 </body>
 </html>
