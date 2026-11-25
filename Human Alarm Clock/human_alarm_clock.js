@@ -17,13 +17,16 @@ function loadAlarmSchedule() {
   } catch (_) { alarmSchedule = {}; }
 }
 function saveAlarmSchedule() {
-  try { localStorage.setItem(ALARM_KEY, JSON.stringify(alarmSchedule)); } catch (_) {}
+  try { localStorage.setItem(ALARM_KEY, JSON.stringify(alarmSchedule)); } catch (error) { console.error("Could not save calendar data:", error); }
 }
 function getAlarmEntry(dateStr) {
   const entry = alarmSchedule[dateStr];
+  if (typeof entry === "string") {
+    return { serviceLevel: entry, note: "", paid: false };
+  }
   return entry && typeof entry === "object"
-    ? { serviceLevel: entry.serviceLevel || "", note: entry.note || "" }
-    : { serviceLevel: "", note: "" };
+    ? { serviceLevel: entry.serviceLevel || "", note: entry.note || "", paid: entry.paid === true }
+    : { serviceLevel: "", note: "", paid: false };
 }
 function alarmToDateStr(date) {
   return date.getFullYear() + "-" + String(date.getMonth() + 1).padStart(2, "0") + "-" + String(date.getDate()).padStart(2, "0");
@@ -43,7 +46,7 @@ function alarmBuildMonthCells(year, month) {
   while (cells.length % 7) cells.push(null);
   return cells;
 }
-function createAlarmIconButton(title, action, dateStr) {
+function makeIconButton(title, action, dateStr) {
   const button = document.createElement("button");
   button.type = "button";
   button.className = "icon-btn " + action;
@@ -52,7 +55,6 @@ function createAlarmIconButton(title, action, dateStr) {
   button.dataset.action = action;
   button.dataset.date = dateStr;
   const paths = {
-    add: '<path d="M12 5v14M5 12h14"/>',
     edit: '<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L8 18l-4 1 1-4Z"/>',
     remove: '<path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="m19 6-1 14H6L5 6"/><path d="M10 11v5M14 11v5"/>'
   };
@@ -79,35 +81,79 @@ function alarmRenderCalendar() {
     if (dateStr) {
       const entry = getAlarmEntry(dateStr);
       const tier = Object.prototype.hasOwnProperty.call(ALARM_TIERS, entry.serviceLevel) ? ALARM_TIERS[entry.serviceLevel] : null;
+      const hasNote = !tier && entry.note.trim().length > 0;
       cell.dataset.date = dateStr;
-      if (tier) cell.classList.add("alarm-red");
+      cell.setAttribute("role", "button");
+      cell.setAttribute("tabindex", "0");
+      cell.setAttribute("aria-label", alarmFormatDateNice(dateStr) + (tier ? ", " + tier.name + (entry.paid ? ", paid" : ", unpaid") : hasNote ? ", " + entry.note : ", add label"));
+      if (tier) cell.classList.add(entry.paid ? "alarm-green" : "alarm-red");
+      else if (hasNote) cell.classList.add("alarm-note");
       if (dateStr === today) cell.classList.add("alarm-today");
+
       const dayNumber = document.createElement("span");
       dayNumber.textContent = String(Number(dateStr.slice(-2)));
       cell.appendChild(dayNumber);
-      const actions = document.createElement("div");
-      actions.className = "cell-actions";
+
       if (tier) {
-        actions.appendChild(createAlarmIconButton("Edit Label", "edit", dateStr));
-        actions.appendChild(createAlarmIconButton("Remove Label", "remove", dateStr));
         const label = document.createElement("div");
         label.className = "alarm-cell-label";
         label.textContent = tier.name + ": " + tier.price;
         cell.appendChild(label);
-      } else {
-        actions.appendChild(createAlarmIconButton("Add Label", "add", dateStr));
+
+        const paidLabel = document.createElement("label");
+        paidLabel.className = "alarm-paid";
+        paidLabel.addEventListener("click", event => event.stopPropagation());
+        const paidCheckbox = document.createElement("input");
+        paidCheckbox.type = "checkbox";
+        paidCheckbox.checked = entry.paid;
+        paidCheckbox.dataset.paidDate = dateStr;
+        paidCheckbox.setAttribute("aria-label", "Mark " + dateStr + " as paid");
+        paidLabel.appendChild(paidCheckbox);
+        paidLabel.appendChild(document.createTextNode(entry.paid ? "Paid" : "Unpaid"));
+        cell.appendChild(paidLabel);
+      } else if (hasNote) {
+        const note = document.createElement("div");
+        note.className = "alarm-cell-note";
+        note.textContent = entry.note;
+        cell.appendChild(note);
       }
-      cell.appendChild(actions);
+
+      if (tier || hasNote) {
+        const actions = document.createElement("div");
+        actions.className = "cell-actions";
+        actions.appendChild(makeIconButton("Remove Label", "remove", dateStr));
+        cell.appendChild(actions);
+      }
     }
     grid.appendChild(cell);
   });
+}
+function updateAlarmServicePrice() {
+  const level = document.getElementById("serviceLevel").value;
+  const tier = ALARM_TIERS[level];
+  const notes = document.getElementById("labelNotes");
+  const price = document.getElementById("servicePrice");
+  const serviceLabel = document.querySelector('label[for="serviceLevel"]');
+  if (level === "notes") {
+    if (serviceLabel) serviceLabel.style.display = "none";
+    price.style.display = "none";
+    notes.classList.add("visible");
+    notes.focus();
+  } else {
+    if (serviceLabel) serviceLabel.style.display = "block";
+    price.style.display = "block";
+    notes.classList.remove("visible");
+    price.textContent = tier ? tier.name + ": " + tier.price : "Select Service Level";
+  }
 }
 function openAlarmModal(dateStr) {
   selectedAlarmDate = dateStr;
   const entry = getAlarmEntry(dateStr);
   const select = document.getElementById("serviceLevel");
-  select.value = Object.prototype.hasOwnProperty.call(ALARM_TIERS, entry.serviceLevel) ? entry.serviceLevel : "";
-  const editing = !!select.value;
+  const notes = document.getElementById("labelNotes");
+  select.value = Object.prototype.hasOwnProperty.call(ALARM_TIERS, entry.serviceLevel) ? entry.serviceLevel : (entry.note ? "notes" : "");
+  notes.value = entry.note;
+  const editing = !!(select.value || entry.note);
   document.getElementById("modalDate").textContent = alarmFormatDateNice(dateStr);
   document.getElementById("modalTitle").textContent = editing ? "Edit Label" : "Add Label";
   document.getElementById("saveLabel").textContent = editing ? "Save Changes" : "Add Label";
@@ -118,10 +164,6 @@ function closeAlarmModal() {
   document.getElementById("labelModal").classList.remove("open");
   selectedAlarmDate = null;
 }
-function updateAlarmServicePrice() {
-  const tier = ALARM_TIERS[document.getElementById("serviceLevel").value];
-  document.getElementById("servicePrice").textContent = tier ? tier.name + ": " + tier.price : "Select Service Level";
-}
 function showCalendarError(error) {
   const container = document.getElementById("alarmCalendar");
   if (container) container.innerHTML = '<p style="color:#b91c1c;font-size:14px">The calendar could not load. Please refresh the page. ' + String(error && error.message ? error.message : "") + '</p>';
@@ -131,31 +173,58 @@ function initAlarmCalendar() {
     loadAlarmSchedule();
     alarmRenderCalendar();
     document.getElementById("alarmCalendar").addEventListener("click", function(event) {
-      const button = event.target.closest("button[data-action], button[data-month]");
-      if (!button) return;
-      if (button.dataset.month !== undefined) {
-        alarmView.month += Number(button.dataset.month);
+      const monthButton = event.target.closest("button[data-month]");
+      if (monthButton) {
+        alarmView.month += Number(monthButton.dataset.month);
         if (alarmView.month < 0) { alarmView.month = 11; alarmView.year--; }
         if (alarmView.month > 11) { alarmView.month = 0; alarmView.year++; }
         alarmRenderCalendar();
         return;
       }
-      const dateStr = button.dataset.date;
-      if (button.dataset.action === "add" || button.dataset.action === "edit") openAlarmModal(dateStr);
-      if (button.dataset.action === "remove") {
-        delete alarmSchedule[dateStr];
-        saveAlarmSchedule();
-        alarmRenderCalendar();
+      const actionButton = event.target.closest("button[data-action]");
+      if (actionButton) {
+        const dateStr = actionButton.dataset.date;
+        if (actionButton.dataset.action === "remove") {
+          delete alarmSchedule[dateStr];
+          saveAlarmSchedule();
+          alarmRenderCalendar();
+        }
+        return;
+      }
+      if (event.target.closest("input[data-paid-date]")) return;
+      const cell = event.target.closest(".alarm-cell[data-date]");
+      if (cell) openAlarmModal(cell.dataset.date);
+    });
+    document.getElementById("alarmCalendar").addEventListener("change", function(event) {
+      const checkbox = event.target.closest("input[data-paid-date]");
+      if (!checkbox) return;
+      const dateStr = checkbox.dataset.paidDate;
+      const entry = getAlarmEntry(dateStr);
+      if (!Object.prototype.hasOwnProperty.call(ALARM_TIERS, entry.serviceLevel)) return;
+      alarmSchedule[dateStr] = { serviceLevel: entry.serviceLevel, note: entry.note, paid: checkbox.checked };
+      saveAlarmSchedule();
+      alarmRenderCalendar();
+    });
+    document.getElementById("alarmCalendar").addEventListener("keydown", function(event) {
+      if ((event.key === "Enter" || event.key === " ") && event.target.matches(".alarm-cell[data-date]")) {
+        event.preventDefault();
+        openAlarmModal(event.target.dataset.date);
       }
     });
     document.getElementById("serviceLevel").addEventListener("change", updateAlarmServicePrice);
     document.getElementById("saveLabel").addEventListener("click", function() {
       const level = document.getElementById("serviceLevel").value;
-      if (!selectedAlarmDate || !Object.prototype.hasOwnProperty.call(ALARM_TIERS, level)) {
-        document.getElementById("serviceLevel").focus();
+      const notes = document.getElementById("labelNotes").value.trim();
+      if (!selectedAlarmDate) return;
+      if (Object.prototype.hasOwnProperty.call(ALARM_TIERS, level)) {
+        const previous = getAlarmEntry(selectedAlarmDate);
+        alarmSchedule[selectedAlarmDate] = { serviceLevel: level, note: "", paid: previous.serviceLevel === level ? previous.paid : false };
+      } else if (level === "notes" && notes) {
+        alarmSchedule[selectedAlarmDate] = { serviceLevel: "", note: notes, paid: false };
+      } else {
+        document.getElementById(level === "notes" ? "labelNotes" : "serviceLevel").focus();
         return;
       }
-      alarmSchedule[selectedAlarmDate] = { serviceLevel: level, note: "" };
       saveAlarmSchedule();
       closeAlarmModal();
       alarmRenderCalendar();
@@ -173,9 +242,6 @@ function initAlarmCalendar() {
     showCalendarError(error);
   }
 }
-if (document.readyState === "loading") {
-  document.addEventListener("DOMContentLoaded", initAlarmCalendar);
-} else {
-  initAlarmCalendar();
-}
+if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", initAlarmCalendar);
+else initAlarmCalendar();
 })();
