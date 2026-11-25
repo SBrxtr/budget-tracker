@@ -26,7 +26,7 @@ a.back{display:inline-block;margin-top:12px;color:var(--primary);font-size:14px;
 .alarm-weekdays div{text-align:center;font-size:11px;font-weight:800;color:var(--muted);text-transform:uppercase}
 .alarm-cell{position:relative;min-width:0;min-height:92px;padding:26px 5px 7px;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;border-radius:10px;background:#f8fafc;border:1px solid var(--line);font-size:14px;font-weight:700;color:var(--text)}
 .alarm-cell.out{background:transparent;border-color:transparent}
-.alarm-cell.alarm-red{background:#fee2e2;border-color:#fecaca;color:#b91c1c}
+.alarm-cell.alarm-red{background:#fee2e2;border-color:#fecaca;color:#b91c1c}\n.alarm-cell.alarm-green{background:#dcfce7;border-color:#86efac;color:#166534}\n.alarm-cell.alarm-note{background:#eff6ff;border-color:#bfdbfe;color:#1d4ed8}\n.alarm-cell{cursor:pointer;transition:background .15s,border-color .15s,transform .15s}\n.alarm-cell:not(.out):hover{border-color:var(--primary);transform:translateY(-1px)}\n.alarm-cell.out{cursor:default;pointer-events:none}\n.alarm-cell-label{line-height:1.25}\n.alarm-paid{display:flex;align-items:center;justify-content:center;gap:4px;margin-top:6px;font-size:10px;font-weight:700;color:inherit}\n.alarm-paid input{width:14px;height:14px;margin:0;accent-color:#16a34a;cursor:pointer}\n.alarm-cell-note{font-size:10px;font-weight:700;margin-top:7px;text-align:center;overflow-wrap:anywhere}
 .alarm-cell.alarm-today{outline:2px solid var(--primary);outline-offset:-2px}
 .alarm-cell-label{font-size:10px;font-weight:800;margin-top:7px;text-align:center;overflow-wrap:anywhere}
 .cell-actions{position:absolute;right:4px;top:4px;display:flex;gap:3px}
@@ -43,7 +43,7 @@ a.back{display:inline-block;margin-top:12px;color:var(--primary);font-size:14px;
 .modal-date{margin:0 0 16px;color:var(--muted);font-size:13px}
 .modal label{display:block;font-size:13px;font-weight:700;margin:0 0 7px}
 .modal select{width:100%;border:1px solid var(--line);border-radius:10px;padding:11px;font:inherit;background:#fff;color:var(--text);outline:none}
-.modal select:focus{border-color:var(--primary)}
+.modal select:focus,.modal textarea:focus{border-color:var(--primary)}\n.modal textarea{display:none;width:100%;min-height:100px;resize:vertical;border:1px solid var(--line);border-radius:10px;padding:11px;font:inherit;color:var(--text);outline:none;margin-top:10px}\n.modal textarea.visible{display:block}
 .service-price{margin:12px 0 0;font-size:14px;font-weight:700;color:var(--muted);min-height:21px}
 .modal-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:20px}
 @media(max-width:560px){.app{padding:16px 9px 40px}.card{padding:12px}.alarm-weekdays,.alarm-grid{gap:3px}.alarm-cell{min-height:76px;padding-top:25px;font-size:12px}.alarm-cell-label{font-size:9px}.icon-btn{width:22px;height:22px;padding:3px}.cell-actions{right:2px;top:3px;gap:2px}}
