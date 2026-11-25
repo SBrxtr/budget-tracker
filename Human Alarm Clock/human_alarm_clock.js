@@ -3,6 +3,7 @@
 const ALARM_KEY = "humanAlarm_schedule";
 const REST_DAYS_KEY = "humanAlarm_restDays";
 let restDays = [];
+let restDaysStartDate = null;
 const ALARM_TIERS = {
   tier1: { name: "Tier 1", price: "P50.00" },
   tier2: { name: "Tier 2", price: "P70.00" },
@@ -21,12 +22,34 @@ function loadAlarmSchedule() {
 function loadRestDays() {
   try {
     const parsed = JSON.parse(localStorage.getItem(REST_DAYS_KEY) || "[]");
-    restDays = Array.isArray(parsed) ? parsed.map(Number).filter(day => Number.isInteger(day) && day >= 0 && day <= 6).slice(0, 2) : [];
-  } catch (_) { restDays = []; }
+    // Support the earlier array format so existing saved schedules keep working.
+    const days = Array.isArray(parsed) ? parsed : (parsed && Array.isArray(parsed.days) ? parsed.days : []);
+    restDays = days.map(Number).filter(day => Number.isInteger(day) && day >= 0 && day <= 6).slice(0, 2);
+    restDaysStartDate = !Array.isArray(parsed) && parsed && /^\\d{4}-\\d{2}-\\d{2}$/.test(parsed.startDate || "")
+      ? parsed.startDate : null;
+  } catch (_) { restDays = []; restDaysStartDate = null; }
 }
 function saveRestDays() {
-  try { localStorage.setItem(REST_DAYS_KEY, JSON.stringify(restDays)); }
+  try { localStorage.setItem(REST_DAYS_KEY, JSON.stringify({ days: restDays, startDate: restDaysStartDate })); }
   catch (error) { console.error("Could not save work schedule:", error); }
+}
+function getISOWeekValue(date) {
+  const value = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+  value.setUTCDate(value.getUTCDate() + 4 - (value.getUTCDay() || 7));
+  const yearStart = new Date(Date.UTC(value.getUTCFullYear(), 0, 1));
+  const week = Math.ceil((((value - yearStart) / 86400000) + 1) / 7);
+  return value.getUTCFullYear() + "-W" + String(week).padStart(2, "0");
+}
+function getMondayOfISOWeek(weekValue) {
+  const match = /^(\\d{4})-W(\\d{2})$/.exec(weekValue || "");
+  if (!match) return null;
+  const year = Number(match[1]);
+  const week = Number(match[2]);
+  if (week < 1 || week > 53) return null;
+  const jan4 = new Date(year, 0, 4);
+  const monday = new Date(year, 0, 4 - ((jan4.getDay() + 6) % 7) + (week - 1) * 7);
+  if (getISOWeekValue(monday) !== weekValue) return null;
+  return alarmToDateStr(monday);
 }
 function updateRestDayHint() {
   const selected = document.querySelectorAll(".rest-day-choice:checked").length;
@@ -36,6 +59,9 @@ function updateRestDayHint() {
   if (save) save.disabled = selected !== 2;
 }
 function openWorkScheduleModal() {
+  const weekInput = document.getElementById("workScheduleStartWeek");
+  weekInput.value = getISOWeekValue(restDaysStartDate
+    ? new Date(restDaysStartDate + "T12:00:00") : new Date());
   document.querySelectorAll(".rest-day-choice").forEach(function(choice) {
     choice.checked = restDays.includes(Number(choice.value));
     choice.disabled = false;
@@ -48,11 +74,17 @@ function closeWorkScheduleModal() {
 }
 function saveWorkScheduleSelection() {
   const selected = Array.from(document.querySelectorAll(".rest-day-choice:checked")).map(choice => Number(choice.value));
-  if (selected.length !== 2) {
+  const weekInput = document.getElementById("workScheduleStartWeek");
+  const monday = getMondayOfISOWeek(weekInput.value);
+  if (selected.length !== 2 || !monday) {
     updateRestDayHint();
+    if (!monday) weekInput.focus();
     return;
   }
+  const today = alarmToDateStr(new Date());
   restDays = selected.sort((a, b) => a - b);
+  // Never apply a newly selected schedule retroactively to dates before today.
+  restDaysStartDate = monday < today ? today : monday;
   saveRestDays();
   closeWorkScheduleModal();
   alarmRenderCalendar();
@@ -155,7 +187,8 @@ function alarmRenderCalendar() {
       cell.setAttribute("role", "button");
       cell.setAttribute("tabindex", "0");
       cell.setAttribute("aria-label", alarmFormatDateNice(dateStr) + (tier ? ", " + tier.name + (entry.paid ? ", paid" : ", unpaid") : hasNote ? ", " + entry.note : ", add label"));
-      const isRestDay = restDays.includes(new Date(dateStr + "T12:00:00").getDay());
+      const isRestDay = (!restDaysStartDate || dateStr >= restDaysStartDate) &&
+        restDays.includes(new Date(dateStr + "T12:00:00").getDay());
       if (isRestDay) cell.classList.add("alarm-rest");
       else if (tier) cell.classList.add(entry.paid ? "alarm-green" : "alarm-red");
       else if (hasNote) cell.classList.add("alarm-note");
