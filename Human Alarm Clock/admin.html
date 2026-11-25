@@ -161,5 +161,7 @@ document.getElementById("alarmPanelClose").addEventListener("click", function ()
 
 alarmRenderCalendar("alarmCalendar", { readOnly: false, onSelect: alarmOpenPanel });
 </script>
+
+<script type="module">import { requireRole } from "./auth-guard.js"; requireRole("admin");</script>
 </body>
 </html>
