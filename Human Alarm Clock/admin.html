@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Human Alarm Clock — Admin</title>
+<style>
+  :root {
+    --bg: #f4f7fb;
+    --card: #ffffff;
+    --text: #172033;
+    --muted: #697386;
+    --line: #e4e8ef;
+    --primary: #2563eb;
+    --primary-dark: #1d4ed8;
+    --danger: #dc2626;
+    --success: #16803c;
+    --shadow: 0 8px 25px rgba(23,32,51,.08);
+  }
+  * { box-sizing: border-box; }
+  body { margin:0; font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: var(--bg); color: var(--text); }
+  .app { width: min(760px, 100%); margin: 0 auto; padding: 20px 14px 40px; }
+  header { margin-bottom: 18px; }
+  h1 { margin: 0 0 5px; font-size: 28px; }
+  .subtitle { margin: 0; color: var(--muted); }
+  .card { background: var(--card); border-radius: 18px; padding: 18px; margin-bottom: 14px; box-shadow: var(--shadow); }
+  .card h2 { margin: 0 0 12px; font-size: 19px; }
+  .note { color: var(--muted); font-size: 13px; margin: 10px 0 0; }
+  a.back { display: inline-block; margin-top: 10px; color: var(--primary); font-weight: 700; font-size: 14px; text-decoration: none; }
+  .primary { background: var(--primary); color: #fff; border: none; padding: 11px 16px; border-radius: 10px; font-weight: 700; font-size: 14px; cursor: pointer; }
+  .secondary { display: inline-block; background: #eef2f9; color: var(--text); border: none; padding: 11px 16px; border-radius: 10px; font-weight: 700; font-size: 14px; cursor: pointer; text-decoration: none; }
+  .alarm-cal-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+  .alarm-month { font-weight: 800; font-size: 18px; }
+  .alarm-nav { background: #eef2f9; border: none; border-radius: 8px; width: 34px; height: 34px; font-size: 20px; cursor: pointer; line-height: 1; }
+  .alarm-weekdays { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; margin-bottom: 4px; }
+  .alarm-weekdays div { text-align: center; font-size: 11px; font-weight: 800; color: var(--muted); text-transform: uppercase; }
+  .alarm-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+  #alarmCalendar { width: 50%; }
+  .alarm-cell { aspect-ratio: 1; min-height: 36px; display: flex; flex-direction: column; align-items: center; justify-content: center; border-radius: 10px; background: #f8fafc; border: 1px solid var(--line); font-size: 13px; font-weight: 700; color: var(--text); }
+  .alarm-cell-label { font-size: 9px; font-weight: 800; margin-top: 1px; text-align: center; }
+  .alarm-cell.out { background: transparent; border-color: transparent; color: #c3c9d6; }
+  .alarm-cell.alarm-red { background: #fee2e2; border-color: #fecaca; color: #b91c1c; }
+  .alarm-cell.alarm-green { background: #dcfce7; border-color: #bbf7d0; color: #15803d; }
+  .alarm-cell.alarm-yellow { background: #fef9c3; border-color: #fde047; color: #854d0e; }
+  .alarm-cell.alarm-today { outline: 2px solid var(--primary); outline-offset: -2px; }
+  .alarm-cell.alarm-clickable { cursor: pointer; }
+  .alarm-cell.alarm-clickable:hover { filter: brightness(0.96); }
+  .alarm-cell.alarm-readonly { cursor: default; }
+  .alarm-panel { position: fixed; top: 0; right: 0; width: min(360px, 92vw); height: 100vh; background: #fff; z-index: 90; box-shadow: -8px 0 25px rgba(23,32,51,.12); padding: 20px; overflow-y: auto; transform: translateX(0); }
+  .alarm-panel h2 { margin-top: 0; }
+  .alarm-panel label { display: block; font-weight: 700; font-size: 13px; margin: 14px 0 6px; }
+  .alarm-panel select, .alarm-panel input[type="text"] { width: 100%; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; font-size: 14px; font-family: inherit; background: #fff; color: var(--text); }
+  .alarm-panel .actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>🛡 Human Alarm Clock — Admin</h1>
+  <p class="subtitle">Schedule the client's wake-up calls.</p>
+  <p style="margin:10px 0 0"><a href="human_alarm_clock.html" class="back">← Back to Human Alarm Clock</a></p>
+</header>
+
+<section class="card">
+  <h2>Calendar</h2>
+  <div id="alarmCalendar"></div>
+</section>
+
+<div id="alarmPanel" class="alarm-panel">
+  <div style="display:flex;justify-content:space-between;align-items:center;">
+    <h2 style="margin:0">Schedule</h2>
+    <button type="button" id="alarmPanelClose" class="secondary" style="padding:6px 10px;">×</button>
+  </div>
+  <p class="note">Selected date: <b id="alarmDateLabel">—</b></p>
+  <label for="serviceLevel">Service Level</label>
+  <select id="serviceLevel">
+    <option value="">Select Service Level</option>
+    <option value="tier1">Tier 1</option>
+    <option value="tier2">Tier 2</option>
+    <option value="tier3">Tier 3</option>
+    <option value="none">None</option>
+  </select>
+  <div id="serviceNoteWrap" style="display:none;margin-top:10px;">
+    <input id="serviceNote" type="text" placeholder="Add Note">
+  </div>
+  <div id="serviceLabel" class="note" style="margin-top:10px;font-weight:800;">Select Service Level</div>
+  <p class="note" id="adminClientNote" style="display:none;color:var(--primary);font-weight:700;">🔒 This date was labeled by the client — you cannot add or change a label here.</p>
+  <div class="actions">
+    <button type="button" id="applyBtn" class="primary">Apply</button>
+    <button type="button" id="removeLabelBtn" class="secondary">Remove Label</button>
+  </div>
+</div>
+
+<script src="human_alarm_clock.js"></script>
+<script>
+let selectedDate = null;
+
+function alarmSyncServiceUI(val, note) {
+  const noteInput = document.getElementById("serviceNote");
+  const noteWrap = document.getElementById("serviceNoteWrap");
+  const serviceLabel = document.getElementById("serviceLabel");
+  if (val === "none") {
+    noteWrap.style.display = "block";
+    if (typeof note === "string") { noteInput.value = note; }
+    serviceLabel.textContent = (noteInput.value || "").trim() || "Add Note";
+  } else {
+    noteWrap.style.display = "none";
+    serviceLabel.textContent = val ? alarmServicePrice(val) : "Select Service Level";
+  }
+}
+
+function alarmOpenPanel(dateStr) {
+  selectedDate = dateStr;
+  const entry = getAlarmEntry(dateStr);
+  const sel = document.getElementById("serviceLevel");
+  const val = entry.serviceLevel === "none" ? "none" : (entry.serviceLevel || "");
+  sel.value = val;
+  alarmSyncServiceUI(val, val === "none" ? entry.note : "");
+  document.getElementById("alarmDateLabel").textContent = alarmFormatDateNice(dateStr);
+  const locked = !!entry.client;
+  document.getElementById("adminClientNote").style.display = locked ? "block" : "none";
+  sel.disabled = locked;
+  document.getElementById("applyBtn").disabled = locked;
+  document.getElementById("removeLabelBtn").disabled = locked;
+  if (locked) { document.getElementById("serviceLabel").textContent = entry.note || "Client label"; }
+  document.getElementById("alarmPanel").classList.add("open");
+}
+
+document.getElementById("alarmCalendar").addEventListener("click", function (e) {
+  const cell = e.target.closest("[data-date]");
+  if (cell) { alarmOpenPanel(cell.dataset.date); }
+});
+
+document.getElementById("serviceLevel").addEventListener("change", function (e) {
+  const val = e.target.value;
+  const note = val === "none" ? (document.getElementById("serviceNote").value || "") : "";
+  alarmSyncServiceUI(val, note);
+});
+
+document.getElementById("applyBtn").addEventListener("click", function () {
+  const val = document.getElementById("serviceLevel").value;
+  const note = val === "none" ? (document.getElementById("serviceNote").value || "").trim() : "";
+  const level = val || "";
+  if (selectedDate) {
+    const entry = getAlarmEntry(selectedDate);
+    if (entry.client) { return; } // date submitted by client — admin cannot label it
+    if (alarmIsRestDay(selectedDate)) { setAlarmEntry(selectedDate, "", ""); }
+    else { setAlarmEntry(selectedDate, level, note); }
+  }
+  alarmRenderCalendar("alarmCalendar", { readOnly: false, onSelect: alarmOpenPanel });
+});
+
+document.getElementById("removeLabelBtn").addEventListener("click", function () {
+  if (selectedDate) { setAlarmEntry(selectedDate, "", ""); }
+  alarmRenderCalendar("alarmCalendar", { readOnly: false, onSelect: alarmOpenPanel });
+  if (selectedDate) { alarmOpenPanel(selectedDate); }
+});
+
+document.getElementById("alarmPanelClose").addEventListener("click", function () {
+  document.getElementById("alarmPanel").classList.remove("open");
+});
+
+alarmRenderCalendar("alarmCalendar", { readOnly: false, onSelect: alarmOpenPanel });
+</script>
+</body>
+</html>

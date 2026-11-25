@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Human Alarm Clock — Client</title>
+<style>
+  :root {
+    --bg: #f4f7fb;
+    --card: #ffffff;
+    --text: #172033;
+    --muted: #697386;
+    --line: #e4e8ef;
+    --primary: #2563eb;
+    --primary-dark: #1d4ed8;
+    --danger: #dc2626;
+    --success: #16803c;
+    --shadow: 0 8px 25px rgba(23,32,51,.08);
+  }
+  * { box-sizing: border-box; }
+  body { margin:0; font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: var(--bg); color: var(--text); }
+  .app { width: min(760px, 100%); margin: 0 auto; padding: 20px 14px 40px; }
+  header { margin-bottom: 18px; }
+  h1 { margin: 0 0 5px; font-size: 28px; }
+  .subtitle { margin: 0; color: var(--muted); }
+  .card { background: var(--card); border-radius: 18px; padding: 18px; margin-bottom: 14px; box-shadow: var(--shadow); }
+  .card h2 { margin: 0 0 12px; font-size: 19px; }
+  .note { color: var(--muted); font-size: 13px; margin: 10px 0 0; }
+  a.back { display: inline-block; margin-top: 10px; color: var(--primary); font-weight: 700; font-size: 14px; text-decoration: none; }
+  .primary { background: var(--primary); color: #fff; border: none; padding: 11px 16px; border-radius: 10px; font-weight: 700; font-size: 14px; cursor: pointer; }
+  .secondary { display: inline-block; background: #eef2f9; color: var(--text); border: none; padding: 11px 16px; border-radius: 10px; font-weight: 700; font-size: 14px; cursor: pointer; text-decoration: none; }
+  .alarm-cal-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+  .alarm-month { font-weight: 800; font-size: 18px; }
+  .alarm-nav { background: #eef2f9; border: none; border-radius: 8px; width: 34px; height: 34px; font-size: 20px; cursor: pointer; line-height: 1; }
+  .alarm-weekdays { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; margin-bottom: 4px; }
+  .alarm-weekdays div { text-align: center; font-size: 11px; font-weight: 800; color: var(--muted); text-transform: uppercase; }
+  .alarm-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+  #alarmCalendarClient { width: 50%; }
+  .alarm-cell { aspect-ratio: 1; min-height: 36px; display: flex; flex-direction: column; align-items: center; justify-content: center; border-radius: 10px; background: #f8fafc; border: 1px solid var(--line); font-size: 13px; font-weight: 700; color: var(--text); }
+  .alarm-cell-label { font-size: 9px; font-weight: 800; margin-top: 1px; text-align: center; }
+  .alarm-cell.out { background: transparent; border-color: transparent; color: #c3c9d6; }
+  .alarm-cell.alarm-red { background: #fee2e2; border-color: #fecaca; color: #b91c1c; }
+  .alarm-cell.alarm-green { background: #dcfce7; border-color: #bbf7d0; color: #15803d; }
+  .alarm-cell.alarm-yellow { background: #fef9c3; border-color: #fde047; color: #854d0e; }
+  .alarm-cell.alarm-today { outline: 2px solid var(--primary); outline-offset: -2px; }
+  .alarm-cell.alarm-readonly { cursor: default; }
+  .alarm-panel { position: fixed; top: 0; right: 0; width: min(360px, 92vw); height: 100vh; background: #fff; z-index: 90; box-shadow: -8px 0 25px rgba(23,32,51,.12); padding: 20px; overflow-y: auto; transform: translateX(0); }
+  .alarm-panel h2 { margin-top: 0; }
+  .alarm-panel select, .alarm-panel input[type="text"] { width: 100%; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; font-size: 14px; font-family: inherit; background: #fff; color: var(--text); }
+  .alarm-panel .actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px; }
+  .alarm-item { border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; margin-bottom: 8px; background: #fff; }
+  .alarm-item .d { font-weight: 800; font-size: 14px; }
+  .alarm-item .l { color: var(--muted); font-size: 13px; margin-top: 2px; }
+  .work-day { display: flex; align-items: center; gap: 8px; padding: 8px 0; border-bottom: 1px solid var(--line); font-size: 14px; font-weight: 600; }
+</style>
+</head>
+<body>
+<header>
+  <h1>🙂 Human Alarm Clock — Client</h1>
+  <p class="subtitle">Your wake-up schedule at a glance.</p>
+  <p style="margin:10px 0 0"><a href="human_alarm_clock.html" class="back">← Back to Human Alarm Clock</a></p>
+</header>
+
+<section class="card">
+  <h2>Calendar</h2>
+  <div id="alarmCalendarClient"></div>
+</section>
+
+<div id="workPanel" class="alarm-panel">
+  <h2>Work Schedule</h2>
+  <p class="note">Select your rest days. The other days are your working days.</p>
+  <div id="workDays" style="display:none;">
+    <label class="work-day"><input type="checkbox" id="workDay_0" value="0"> Sunday</label>
+    <label class="work-day"><input type="checkbox" id="workDay_1" value="1"> Monday</label>
+    <label class="work-day"><input type="checkbox" id="workDay_2" value="2"> Tuesday</label>
+    <label class="work-day"><input type="checkbox" id="workDay_3" value="3"> Wednesday</label>
+    <label class="work-day"><input type="checkbox" id="workDay_4" value="4"> Thursday</label>
+    <label class="work-day"><input type="checkbox" id="workDay_5" value="5"> Friday</label>
+    <label class="work-day"><input type="checkbox" id="workDay_6" value="6"> Saturday</label>
+  </div>
+  <div class="actions">
+    <button type="button" id="workApplyBtn" class="primary">Apply</button>
+  </div>
+  <button type="button" id="updateRestDaysBtn" class="secondary" style="margin-top:12px;">Update Rest Days</button>
+  <h2 style="margin:20px 0 12px">Client Labeling</h2>
+  <p class="note">Selected date: <b id="clientLabelDate">—</b></p>
+  <button type="button" id="clientLabelAskBtn" class="secondary">What labeling?</button>
+  <div id="clientLabelWrap" style="display:none;margin-top:10px;">
+    <select id="clientLabelType">
+      <option value="">Select labeling...</option>
+      <option value="vacation">Vacation Leave</option>
+      <option value="sick">Sick Leave</option>
+      <option value="other">Other</option>
+    </select>
+    <div id="clientOtherWrap" style="display:none;margin-top:10px;">
+      <input id="clientOtherNote" type="text" placeholder="Enter reason">
+    </div>
+    <div id="clientLabelValue" class="note" style="margin-top:10px;font-weight:800;"></div>
+  </div>
+  <div class="actions">
+    <button type="button" id="clientLabelApplyBtn" class="primary">Apply</button>
+    <button type="button" id="clientSubmitBtn" class="secondary">Submit to Admin</button>
+  </div>
+</div>
+
+<script src="human_alarm_clock.js"></script>
+<script>
+let selectedClientDate = null;
+const clientLabelAskBtn = document.getElementById("clientLabelAskBtn");
+const clientLabelWrap = document.getElementById("clientLabelWrap");
+const clientLabelType = document.getElementById("clientLabelType");
+const clientOtherWrap = document.getElementById("clientOtherWrap");
+const clientOtherNote = document.getElementById("clientOtherNote");
+const clientLabelValue = document.getElementById("clientLabelValue");
+const updateRestDaysBtn = document.getElementById("updateRestDaysBtn");
+const workDays = document.getElementById("workDays");
+
+function clientOpenLabelPanel(dateStr) {
+  selectedClientDate = dateStr;
+  document.getElementById("clientLabelDate").textContent = alarmFormatDateNice(dateStr);
+  clientLabelType.value = "";
+  clientOtherWrap.style.display = "none";
+  clientLabelWrap.style.display = "none";
+  clientLabelValue.textContent = "";
+}
+clientLabelAskBtn.addEventListener("click", function () { clientLabelWrap.style.display = (clientLabelWrap.style.display === "none") ? "block" : "none"; });
+clientLabelType.addEventListener("change", function () { clientOtherWrap.style.display = (clientLabelType.value === "other") ? "block" : "none"; });
+function clientGetLabelText() {
+  const type = clientLabelType.value;
+  if (type === "vacation") { return "Vacation Leave"; }
+  if (type === "sick") { return "Sick Leave"; }
+  if (type === "other") { return (clientOtherNote.value || "").trim() || "Other"; }
+  return "";
+}
+document.getElementById("clientLabelApplyBtn").addEventListener("click", function () {
+  if (!selectedClientDate) { return; }
+  const labelText = clientGetLabelText();
+  if (labelText) {
+    const prev = getAlarmEntry(selectedClientDate);
+    alarmSchedule[selectedClientDate] = { serviceLevel: "", note: labelText, client: !!prev.client };
+    saveAlarmSchedule();
+    clientLabelValue.textContent = "Label applied to calendar";
+  }
+  alarmRenderCalendar("alarmCalendarClient", { readOnly: false, onSelect: clientOpenLabelPanel });
+});
+document.getElementById("clientSubmitBtn").addEventListener("click", function () {
+  if (!selectedClientDate) { return; }
+  let labelText = clientGetLabelText();
+  if (!labelText) { labelText = getAlarmEntry(selectedClientDate).note || ""; }
+  if (!labelText) { clientLabelValue.textContent = "Select a label first."; return; }
+  // reflect the selected date to the admin side and lock it from admin labeling
+  alarmSchedule[selectedClientDate] = { serviceLevel: "", note: labelText, client: true, submitted: true };
+  saveAlarmSchedule();
+  clientLabelValue.textContent = "Submitted to Admin ✓";
+  alarmRenderCalendar("alarmCalendarClient", { readOnly: false, onSelect: clientOpenLabelPanel });
+});
+updateRestDaysBtn.addEventListener("click", function () { workDays.style.display = (workDays.style.display === "none") ? "block" : "none"; });
+
+document.getElementById("alarmCalendarClient").addEventListener("click", function (e) {
+  const cell = e.target.closest("[data-date]");
+  if (cell) { clientOpenLabelPanel(cell.dataset.date); }
+});
+
+function saveWorkSchedule() {
+  const rest = [];
+  for (let i = 0; i < 7; i++) {
+    const chk = document.getElementById("workDay_" + i);
+    if (chk && chk.checked) { rest.push(i); }
+  }
+  setAlarmRestDays(rest);
+  alarmRenderCalendar("alarmCalendarClient", { readOnly: true });
+}
+document.getElementById("workApplyBtn").addEventListener("click", function () { saveWorkSchedule(); });
+
+loadAlarmSchedule();
+alarmRenderCalendar("alarmCalendarClient", { readOnly: false, onSelect: clientOpenLabelPanel });
+</script>
+</body>
+</html>
