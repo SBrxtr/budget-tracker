@@ -1,6 +1,8 @@
 (() => {
 "use strict";
 const ALARM_KEY = "humanAlarm_schedule";
+const REST_DAYS_KEY = "humanAlarm_restDays";
+let restDays = [];
 const ALARM_TIERS = {
   tier1: { name: "Tier 1", price: "P50.00" },
   tier2: { name: "Tier 2", price: "P70.00" },
@@ -15,6 +17,45 @@ function loadAlarmSchedule() {
     const parsed = JSON.parse(localStorage.getItem(ALARM_KEY) || "{}");
     alarmSchedule = parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {};
   } catch (_) { alarmSchedule = {}; }
+}
+function loadRestDays() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(REST_DAYS_KEY) || "[]");
+    restDays = Array.isArray(parsed) ? parsed.map(Number).filter(day => Number.isInteger(day) && day >= 0 && day <= 6).slice(0, 2) : [];
+  } catch (_) { restDays = []; }
+}
+function saveRestDays() {
+  try { localStorage.setItem(REST_DAYS_KEY, JSON.stringify(restDays)); }
+  catch (error) { console.error("Could not save work schedule:", error); }
+}
+function updateRestDayHint() {
+  const selected = document.querySelectorAll(".rest-day-choice:checked").length;
+  const hint = document.getElementById("restDayHint");
+  if (hint) hint.textContent = selected + " of 2 days selected";
+  const save = document.getElementById("saveWorkSchedule");
+  if (save) save.disabled = selected !== 2;
+}
+function openWorkScheduleModal() {
+  document.querySelectorAll(".rest-day-choice").forEach(function(choice) {
+    choice.checked = restDays.includes(Number(choice.value));
+    choice.disabled = false;
+  });
+  updateRestDayHint();
+  document.getElementById("workScheduleModal").classList.add("open");
+}
+function closeWorkScheduleModal() {
+  document.getElementById("workScheduleModal").classList.remove("open");
+}
+function saveWorkScheduleSelection() {
+  const selected = Array.from(document.querySelectorAll(".rest-day-choice:checked")).map(choice => Number(choice.value));
+  if (selected.length !== 2) {
+    updateRestDayHint();
+    return;
+  }
+  restDays = selected.sort((a, b) => a - b);
+  saveRestDays();
+  closeWorkScheduleModal();
+  alarmRenderCalendar();
 }
 function saveAlarmSchedule() {
   try { localStorage.setItem(ALARM_KEY, JSON.stringify(alarmSchedule)); } catch (error) { console.error("Could not save calendar data:", error); }
@@ -114,7 +155,9 @@ function alarmRenderCalendar() {
       cell.setAttribute("role", "button");
       cell.setAttribute("tabindex", "0");
       cell.setAttribute("aria-label", alarmFormatDateNice(dateStr) + (tier ? ", " + tier.name + (entry.paid ? ", paid" : ", unpaid") : hasNote ? ", " + entry.note : ", add label"));
-      if (tier) cell.classList.add(entry.paid ? "alarm-green" : "alarm-red");
+      const isRestDay = restDays.includes(new Date(dateStr + "T12:00:00").getDay());
+      if (isRestDay) cell.classList.add("alarm-rest");
+      else if (tier) cell.classList.add(entry.paid ? "alarm-green" : "alarm-red");
       else if (hasNote) cell.classList.add("alarm-note");
       if (dateStr === today) cell.classList.add("alarm-today");
 
@@ -144,6 +187,13 @@ function alarmRenderCalendar() {
         note.className = "alarm-cell-note";
         note.textContent = entry.note;
         cell.appendChild(note);
+      }
+
+      if (isRestDay) {
+        const restLabel = document.createElement("div");
+        restLabel.className = "alarm-rest-label";
+        restLabel.textContent = "Rest Day";
+        cell.appendChild(restLabel);
       }
 
       if (tier || hasNote) {
@@ -200,7 +250,23 @@ function showCalendarError(error) {
 function initAlarmCalendar() {
   try {
     loadAlarmSchedule();
+    loadRestDays();
     alarmRenderCalendar();
+
+    document.getElementById("openWorkSchedule").addEventListener("click", openWorkScheduleModal);
+    document.getElementById("closeWorkSchedule").addEventListener("click", closeWorkScheduleModal);
+    document.getElementById("cancelWorkSchedule").addEventListener("click", closeWorkScheduleModal);
+    document.getElementById("saveWorkSchedule").addEventListener("click", saveWorkScheduleSelection);
+    document.getElementById("workScheduleModal").addEventListener("click", function(event) {
+      if (event.target === this) closeWorkScheduleModal();
+    });
+    document.querySelectorAll(".rest-day-choice").forEach(function(choice) {
+      choice.addEventListener("change", function() {
+        const selected = Array.from(document.querySelectorAll(".rest-day-choice:checked"));
+        if (selected.length > 2) choice.checked = false;
+        updateRestDayHint();
+      });
+    });
     document.getElementById("alarmCalendar").addEventListener("click", function(event) {
       const monthButton = event.target.closest("button[data-month]");
       if (monthButton) {
@@ -265,6 +331,7 @@ function initAlarmCalendar() {
     });
     document.addEventListener("keydown", function(event) {
       if (event.key === "Escape" && document.getElementById("labelModal").classList.contains("open")) closeAlarmModal();
+      if (event.key === "Escape" && document.getElementById("workScheduleModal").classList.contains("open")) closeWorkScheduleModal();
     });
   } catch (error) {
     console.error("Human Alarm Clock initialization failed:", error);
