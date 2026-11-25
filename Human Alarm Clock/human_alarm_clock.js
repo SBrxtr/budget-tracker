@@ -249,6 +249,7 @@ function alarmRenderCalendar() {
         const paidCheckbox = document.createElement("input");
         paidCheckbox.type = "checkbox";
         paidCheckbox.checked = entry.paid;
+        paidCheckbox.disabled = isRestDay;
         paidCheckbox.dataset.paidDate = dateStr;
         paidCheckbox.setAttribute("aria-label", "Mark " + dateStr + " as paid");
         paidLabel.appendChild(paidCheckbox);
