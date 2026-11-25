@@ -33,23 +33,16 @@ function saveRestDays() {
   try { localStorage.setItem(REST_DAYS_KEY, JSON.stringify({ days: restDays, startDate: restDaysStartDate })); }
   catch (error) { console.error("Could not save work schedule:", error); }
 }
-function getISOWeekValue(date) {
-  const value = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
-  value.setUTCDate(value.getUTCDate() + 4 - (value.getUTCDay() || 7));
-  const yearStart = new Date(Date.UTC(value.getUTCFullYear(), 0, 1));
-  const week = Math.ceil((((value - yearStart) / 86400000) + 1) / 7);
-  return value.getUTCFullYear() + "-W" + String(week).padStart(2, "0");
+function getSundayOfWeek(date) {
+  const sunday = new Date(date.getFullYear(), date.getMonth(), date.getDate() - date.getDay());
+  return alarmToDateStr(sunday);
 }
-function getMondayOfISOWeek(weekValue) {
-  const match = /^(\d{4})-W(\d{2})$/.exec(weekValue || "");
-  if (!match) return null;
-  const year = Number(match[1]);
-  const week = Number(match[2]);
-  if (week < 1 || week > 53) return null;
-  const jan4 = new Date(year, 0, 4);
-  const monday = new Date(year, 0, 4 - ((jan4.getDay() + 6) % 7) + (week - 1) * 7);
-  if (getISOWeekValue(monday) !== weekValue) return null;
-  return alarmToDateStr(monday);
+function getSundayFromDateValue(dateValue) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateValue || "")) return null;
+  const parts = dateValue.split("-").map(Number);
+  const chosenDate = new Date(parts[0], parts[1] - 1, parts[2]);
+  if (Number.isNaN(chosenDate.getTime()) || alarmToDateStr(chosenDate) !== dateValue) return null;
+  return getSundayOfWeek(chosenDate);
 }
 function updateRestDayHint() {
   const selected = document.querySelectorAll(".rest-day-choice:checked").length;
@@ -60,7 +53,7 @@ function updateRestDayHint() {
 }
 function openWorkScheduleModal() {
   const weekInput = document.getElementById("workScheduleStartWeek");
-  weekInput.value = getISOWeekValue(restDaysStartDate
+  weekInput.value = getSundayOfWeek(restDaysStartDate
     ? new Date(restDaysStartDate + "T12:00:00") : new Date());
   document.querySelectorAll(".rest-day-choice").forEach(function(choice) {
     choice.checked = restDays.includes(Number(choice.value));
@@ -75,16 +68,16 @@ function closeWorkScheduleModal() {
 function saveWorkScheduleSelection() {
   const selected = Array.from(document.querySelectorAll(".rest-day-choice:checked")).map(choice => Number(choice.value));
   const weekInput = document.getElementById("workScheduleStartWeek");
-  const monday = getMondayOfISOWeek(weekInput.value);
-  if (selected.length !== 2 || !monday) {
+  const sunday = getSundayFromDateValue(weekInput.value);
+  if (selected.length !== 2 || !sunday) {
     updateRestDayHint();
-    if (!monday) weekInput.focus();
+    if (!sunday) weekInput.focus();
     return;
   }
   const today = alarmToDateStr(new Date());
   restDays = selected.sort((a, b) => a - b);
-  // Never apply a newly selected schedule retroactively to dates before today.
-  restDaysStartDate = monday < today ? today : monday;
+  // Weeks start on Sunday; never apply a new schedule retroactively.
+  restDaysStartDate = sunday < today ? today : sunday;
   saveRestDays();
   closeWorkScheduleModal();
   alarmRenderCalendar();
